@@ -1,15 +1,19 @@
 package com.example.moodmelody
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
@@ -19,24 +23,148 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext           // 关键: 导入LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import androidx.compose.ui.unit.LayoutDirection
+import com.example.moodmelody.network.RetrofitClient
+import com.example.moodmelody.ui.SongPlayer
+import com.example.moodmelody.viewmodel.MusicViewModel
+
+/**
+ * 数据类Song(若已在其它地方定义，可去掉这里)
+ */
+data class Song(
+    val title: String,
+    val artist: String,
+    val coverUrl: String? = null,
+    val uri: String? = null,
+    val previewUrl: String? = null,
+    val genre: String? = null
+)
+
+// ==================== 其他Compose示例 ====================
+
+@Composable
+fun MoodTestScreen(
+    paddingValues: PaddingValues,
+    currentQuestion: Int,
+    onAnswerSelected: (Int) -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(text = "Question #$currentQuestion", fontSize = 24.sp)
+            Spacer(modifier = Modifier.height(16.dp))
+            // 假设答案只有五个选项
+            for (i in 1..5) {
+                Button(onClick = { onAnswerSelected(i) }, modifier = Modifier.padding(4.dp)) {
+                    Text("Answer $i")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StatsScreen(paddingValues: PaddingValues) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = "Stats Screen (未实现)")
+    }
+}
+
+@Composable
+fun MoodSelectionGrid(
+    onMoodSelected: (String) -> Unit,
+    selectedMood: String?
+) {
+    val moods = listOf("Sad", "Calm", "Neutral", "Happy", "Excited")
+    LazyVerticalGrid(columns = GridCells.Fixed(3), content = {
+        items(moods) { mood ->
+            Box(
+                modifier = Modifier
+                    .padding(8.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        if (mood == selectedMood) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceVariant
+                    )
+                    .clickable { onMoodSelected(mood) }
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = mood,
+                    color = if (mood == selectedMood) MaterialTheme.colorScheme.onPrimary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    })
+}
+
+// ==================== MainActivity ====================
 
 class MainActivity : ComponentActivity() {
+    private lateinit var musicViewModel: MusicViewModel
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 获取ViewModel实例
+        musicViewModel = (application as MoodMelodyApp).musicViewModel
+
+        // 处理Spotify认证返回的Token(如果有)
+        handleSpotifyAuthentication(intent)
+
         setContent {
             MaterialTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MoodMelodyApp()
+                    MoodMelodyApp(musicViewModel)
+                }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleSpotifyAuthentication(intent)
+    }
+
+    private fun handleSpotifyAuthentication(intent: Intent) {
+        val uri = intent.data
+        if (uri != null && uri.toString().startsWith("moodmelody://callback")) {
+            val fragment = uri.fragment
+            if (fragment != null) {
+                val params = fragment.split("&").associate {
+                    val parts = it.split("=")
+                    if (parts.size >= 2) parts[0] to parts[1] else parts[0] to ""
+                }
+                val token = params["access_token"]
+                if (token != null) {
+                    // 设置Token到RetrofitClient
+                    RetrofitClient.updateSpotifyToken(token)
+                    // 你也可以存到SharedPreferences，以便下次启动App不必再次登录
                 }
             }
         }
@@ -45,29 +173,37 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MoodMelodyApp() {
+fun MoodMelodyApp(viewModel: MusicViewModel) {
     var selectedTab by remember { mutableStateOf(0) }
-    val scope = rememberCoroutineScope()
 
-    // States for Home tab
+    // 1) 判断当前是否有Token
+    // 在MoodMelodyApp composable中的这行
+    var hasSpotifyToken by remember {
+        mutableStateOf(RetrofitClient.hasToken())
+    }
+
+    // 2) 从 ViewModel 读取搜索/推荐/错误/加载等状态
+    val isLoading by viewModel.isLoading.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+    val searchResults by viewModel.searchResults.collectAsState()
+    val recommendations by viewModel.recommendations.collectAsState()
+
+    // 播放器中的当前歌曲
+    val currentSong by viewModel.currentSong.collectAsState()
+
+    // Home Tab 的一些UI状态
     var selectedMood by remember { mutableStateOf<String?>(null) }
     var moodIntensity by remember { mutableStateOf(3) }
     var showMusicRecommendations by remember { mutableStateOf(false) }
 
-    // States for Search tab
+    // Search Tab
     var searchQuery by remember { mutableStateOf("") }
-    var isSearching by remember { mutableStateOf(false) }
-    var searchResults by remember { mutableStateOf<List<Song>>(emptyList()) }
 
-    // States for Test tab
+    // Test Tab
     var currentTestQuestion by remember { mutableStateOf(0) }
     var testAnswers by remember { mutableStateOf(listOf<Int>()) }
 
-    // 现在是初版 故采用的api模拟方法（出自claude） 后续替换为开发者sdk 现在还暂时没有办法搜索到音乐
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var recommendations by remember { mutableStateOf<List<Song>>(emptyList()) }
-    // 模拟的天气界面 后续替换为真实api
+    // 模拟天气
     val currentWeather = "Sunny, 72°F"
 
     Scaffold(
@@ -109,93 +245,285 @@ fun MoodMelodyApp() {
             }
         }
     ) { paddingValues ->
-        when (selectedTab) {
-            0 -> { // Home Tab
-                HomeScreen(
-                    paddingValues = paddingValues,
-                    currentWeather = currentWeather,
-                    selectedMood = selectedMood,
-                    moodIntensity = moodIntensity,
-                    showMusicRecommendations = showMusicRecommendations,
-                    isLoading = isLoading,
-                    errorMessage = errorMessage,
-                    recommendations = recommendations,
-                    onMoodSelected = { mood -> selectedMood = mood },
-                    onIntensityChanged = { intensity -> moodIntensity = intensity },
-                    onGetRecommendations = {
-                        scope.launch {
-                            try {
-                                isLoading = true
-                                errorMessage = null
-                                // Simulate API call
-                                delay(1000)
-                                recommendations = getMockRecommendations(selectedMood ?: "neutral")
+        // 3) 如果还没有 Token，就显示一个登录按钮
+        if (!hasSpotifyToken) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentAlignment = Alignment.Center
+            ) {
+                SpotifyLoginButton(
+                    onLoginSuccess = {
+                        // 当登录成功(拿到token)后, 刷新 hasSpotifyToken
+                        hasSpotifyToken = true
+                    }
+                )
+            }
+        } else {
+            // 有Token, 正常显示4个Tab页
+            Box(modifier = Modifier.fillMaxSize()) {
+                when (selectedTab) {
+                    0 -> {
+                        HomeScreen(
+                            paddingValues = PaddingValues(
+                                top = paddingValues.calculateTopPadding(),
+                                bottom = paddingValues.calculateBottomPadding() +
+                                        if (currentSong != null) 80.dp else 0.dp,
+                                start = paddingValues.calculateStartPadding(LayoutDirection.Ltr),
+                                end = paddingValues.calculateEndPadding(LayoutDirection.Ltr)
+                            ),
+                            currentWeather = currentWeather,
+                            selectedMood = selectedMood,
+                            moodIntensity = moodIntensity,
+                            showMusicRecommendations = showMusicRecommendations,
+                            isLoading = isLoading,
+                            errorMessage = errorMessage,
+                            recommendations = recommendations,
+                            onMoodSelected = { mood -> selectedMood = mood },
+                            onIntensityChanged = { intensity -> moodIntensity = intensity },
+                            onGetRecommendations = {
+                                viewModel.getRecommendations(
+                                    mood = selectedMood ?: "neutral",
+                                    intensity = moodIntensity
+                                )
                                 showMusicRecommendations = true
-                            } catch (e: Exception) {
-                                errorMessage = "Failed to get recommendations: ${e.message}"
-                            } finally {
-                                isLoading = false
-                            }
-                        }
-                    },
-                    onBackToMoodSelection = { showMusicRecommendations = false }
-                )
-            }
-            1 -> { // Search Tab
-                SearchScreen(
-                    paddingValues = paddingValues,
-                    searchQuery = searchQuery,
-                    isSearching = isSearching,
-                    searchResults = searchResults,
-                    onSearchQueryChanged = { searchQuery = it },
-                    onSearch = {
-                        scope.launch {
-                            try {
-                                isSearching = true
-                                // 模拟api访问
-                                delay(800)
-                                searchResults = searchMusic(searchQuery)
-                            } catch (e: Exception) {
-                                // 错误信息（后续删除）
-                            } finally {
-                                isSearching = false
-                            }
-                        }
+                            },
+                            onBackToMoodSelection = { showMusicRecommendations = false },
+                            onSongClick = { song -> viewModel.playSong(song) }
+                        )
                     }
-                )
-            }
-            2 -> { // Test Tab
-                MoodTestScreen(
-                    paddingValues = paddingValues,
-                    currentQuestion = currentTestQuestion,
-                    onAnswerSelected = { answer ->
-                        testAnswers = testAnswers + answer
-                        if (currentTestQuestion < 4) {
-                            currentTestQuestion += 1
-                        } else {
-                            // Test completed, determine mood based on answers
-                            val determinedMood = when (testAnswers.sum()) {
-                                in 0..5 -> "Sad"
-                                in 6..10 -> "Calm"
-                                in 11..15 -> "Neutral"
-                                in 16..20 -> "Happy"
-                                else -> "Excited"
-                            }
-                            selectedMood = determinedMood
-                            selectedTab = 0 // Go back to home tab
-                            currentTestQuestion = 0
-                            testAnswers = listOf()
-                        }
+                    1 -> {
+                        SearchScreen(
+                            paddingValues = PaddingValues(
+                                top = paddingValues.calculateTopPadding(),
+                                bottom = paddingValues.calculateBottomPadding() +
+                                        if (currentSong != null) 80.dp else 0.dp,
+                                start = paddingValues.calculateStartPadding(LayoutDirection.Ltr),
+                                end = paddingValues.calculateEndPadding(LayoutDirection.Ltr)
+                            ),
+                            searchQuery = searchQuery,
+                            isSearching = isLoading,
+                            searchResults = searchResults,
+                            onSearchQueryChanged = { searchQuery = it },
+                            onSearch = {
+                                viewModel.searchMusic(searchQuery)
+                            },
+                            onSongClick = { song -> viewModel.playSong(song) }
+                        )
                     }
-                )
-            }
-            3 -> { // Stats Tab
-                StatsScreen(paddingValues = paddingValues)
+                    2 -> {
+                        // Mood Test Tab
+                        MoodTestScreen(
+                            paddingValues = PaddingValues(
+                                top = paddingValues.calculateTopPadding(),
+                                bottom = paddingValues.calculateBottomPadding() +
+                                        if (currentSong != null) 80.dp else 0.dp,
+                                start = paddingValues.calculateStartPadding(LayoutDirection.Ltr),
+                                end = paddingValues.calculateEndPadding(LayoutDirection.Ltr)
+                            ),
+                            currentQuestion = currentTestQuestion,
+                            onAnswerSelected = { answer ->
+                                testAnswers = testAnswers + answer
+                                if (currentTestQuestion < 4) {
+                                    currentTestQuestion += 1
+                                } else {
+                                    // Test completed, determine mood based on answers
+                                    val sum = testAnswers.sum()
+                                    val determinedMood = when (sum) {
+                                        in 0..5 -> "Sad"
+                                        in 6..10 -> "Calm"
+                                        in 11..15 -> "Neutral"
+                                        in 16..20 -> "Happy"
+                                        else -> "Excited"
+                                    }
+                                    selectedMood = determinedMood
+                                    selectedTab = 0 // 回到主页
+                                    currentTestQuestion = 0
+                                    testAnswers = listOf()
+                                }
+                            }
+                        )
+                    }
+                    3 -> {
+                        // Stats Tab
+                        StatsScreen(
+                            paddingValues = PaddingValues(
+                                top = paddingValues.calculateTopPadding(),
+                                bottom = paddingValues.calculateBottomPadding() +
+                                        if (currentSong != null) 80.dp else 0.dp,
+                                start = paddingValues.calculateStartPadding(LayoutDirection.Ltr),
+                                end = paddingValues.calculateEndPadding(LayoutDirection.Ltr)
+                            )
+                        )
+                    }
+                }
+
+                // 底部播放器
+                if (currentSong != null) {
+                    Column(modifier = Modifier.align(Alignment.BottomCenter)) {
+                        SongPlayer(
+                            viewModel = viewModel,
+                            modifier = Modifier.padding(
+                                bottom = paddingValues.calculateBottomPadding()
+                            )
+                        )
+                    }
+                }
             }
         }
     }
 }
 
+/** 一个单独的Composable来放"Login with Spotify"按钮,用LocalContext获取Context. */
+@Composable
+fun SpotifyLoginButton(onLoginSuccess: () -> Unit) {
+    val context = LocalContext.current
+    Button(onClick = {
+        val clientId = "7f598bd5b59b4884b4e5db9997a05cc1" // TODO: 替换成真实ID
+        val redirectUri = "moodmelody://callback"
+        val scopes = "user-read-private%20playlist-read-private"
+        val authUrl = "https://accounts.spotify.com/authorize" +
+                "?client_id=$clientId" +
+                "&response_type=token" +
+                "&redirect_uri=$redirectUri" +
+                "&scope=$scopes"
+
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(authUrl))
+        context.startActivity(intent)
+
+        // 注意: 只有当 Spotify 成功回调后, handleSpotifyAuthentication 里设置token,
+        // UI 才会更新. 这里 onLoginSuccess() 可以选在别处时机调用,
+        // 不过通常等 handleSpotifyAuthentication 解析成功后,
+        // 重新进入Compose时 "hasSpotifyToken" 就会变true.
+        // 你可以在 handleSpotifyAuthentication 解析完 token 后,
+        // 直接 recreate Activity 或走别的机制让UI刷新.
+        // 这里暂时留空.
+    }) {
+        Text("Login with Spotify")
+    }
+}
+
+// 与心灵鸡汤相关函数
+fun getMoodMotivationalText(mood: String?): String {
+    return when (mood?.lowercase()) {
+        "sad" -> "It's okay to be sad sometimes, allow yourself to rest."
+        "calm" -> "Take a deep breath and enjoy the tranquility."
+        "neutral" -> "Sometimes a quiet mind is a peaceful mind."
+        "happy" -> "Share your joy with the world around you."
+        "excited" -> "Keep up the energy and let the good vibes roll!"
+        else -> "Music can help shape your mood—explore and find what's best for you!"
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SearchScreen(
+    paddingValues: PaddingValues,
+    searchQuery: String,
+    isSearching: Boolean,
+    searchResults: List<Song>,
+    onSearchQueryChanged: (String) -> Unit,
+    onSearch: () -> Unit,
+    onSongClick: (Song) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .padding(paddingValues)
+            .padding(16.dp)
+            .fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = onSearchQueryChanged,
+            label = { Text("Search for music") },
+            modifier = Modifier.fillMaxWidth(),
+            trailingIcon = {
+                IconButton(onClick = onSearch) {
+                    Text("Search")
+                }
+            }
+        )
+
+        if (isSearching) {
+            CircularProgressIndicator(modifier = Modifier.padding(16.dp))
+        } else if (searchResults.isNotEmpty()) {
+            LazyColumn(
+                modifier = Modifier.weight(1f)
+            ) {
+                items(searchResults) { song ->
+                    SongItem(song = song, onSongClick = onSongClick)
+                }
+            }
+        } else if (searchQuery.isNotEmpty()) {
+            Text(
+                text = "No results found for '$searchQuery'",
+                modifier = Modifier.padding(16.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun SongItem(
+    song: Song,
+    onSongClick: (Song) -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .clickable { onSongClick(song) }
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Song cover placeholder
+            Box(
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color.LightGray),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("🎵")
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // Song info
+            Column {
+                Text(
+                    text = song.title,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = song.artist,
+                    color = Color.Gray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                if (song.genre != null) {
+                    Text(
+                        text = song.genre,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** HomeScreen: 不用模拟推荐, 全部基于ViewModel返回的recommendations, errorMessage, isLoading来展示 */
 @Composable
 fun HomeScreen(
     paddingValues: PaddingValues,
@@ -209,7 +537,8 @@ fun HomeScreen(
     onMoodSelected: (String) -> Unit,
     onIntensityChanged: (Int) -> Unit,
     onGetRecommendations: () -> Unit,
-    onBackToMoodSelection: () -> Unit
+    onBackToMoodSelection: () -> Unit,
+    onSongClick: (Song) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -269,7 +598,10 @@ fun HomeScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     items(recommendations) { song ->
-                        SongItem(song)
+                        SongItem(
+                            song = song,
+                            onSongClick = onSongClick
+                        )
                     }
                 }
             }
@@ -349,388 +681,5 @@ fun HomeScreen(
                 }
             }
         }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SearchScreen(
-    paddingValues: PaddingValues,
-    searchQuery: String,
-    isSearching: Boolean,
-    searchResults: List<Song>,
-    onSearchQueryChanged: (String) -> Unit,
-    onSearch: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .padding(paddingValues)
-            .padding(16.dp)
-            .fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = onSearchQueryChanged,
-            label = { Text("Search for music") },
-            modifier = Modifier.fillMaxWidth(),
-            trailingIcon = {
-                IconButton(onClick = onSearch) {
-                    Text("Search")
-                }
-            }
-        )
-
-        if (isSearching) {
-            CircularProgressIndicator(modifier = Modifier.padding(16.dp))
-        } else if (searchResults.isNotEmpty()) {
-            LazyColumn(
-                modifier = Modifier.weight(1f)
-            ) {
-                items(searchResults) { song ->
-                    SongItem(song)
-                }
-            }
-        } else if (searchQuery.isNotEmpty()) {
-            Text(
-                text = "No results found for '$searchQuery'",
-                modifier = Modifier.padding(16.dp)
-            )
-        }
-    }
-}
-
-@Composable
-fun MoodTestScreen(
-    paddingValues: PaddingValues,
-    currentQuestion: Int,
-    onAnswerSelected: (Int) -> Unit
-) {
-    val questions = listOf(
-        "How energetic do you feel right now?",
-        "How social do you feel today?",
-        "How focused are you on your tasks?",
-        "How optimistic do you feel about today?",
-        "How relaxed do you feel currently?"
-    )
-
-    Column(
-        modifier = Modifier
-            .padding(paddingValues)
-            .padding(16.dp)
-            .fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "Mood Test (${currentQuestion + 1}/5)",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 24.dp)
-        )
-
-        Text(
-            text = questions[currentQuestion],
-            fontSize = 18.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(bottom = 32.dp)
-        )
-
-        // Answer options
-        val options = listOf("Not at all", "Slightly", "Moderately", "Very", "Extremely")
-        val colors = listOf(
-            Color(0xFFE57373), // Red-ish
-            Color(0xFFFFB74D), // Orange-ish
-            Color(0xFFFFF176), // Yellow-ish
-            Color(0xFF81C784), // Green-ish
-            Color(0xFF64B5F6)  // Blue-ish
-        )
-
-        options.forEachIndexed { index, option ->
-            Card(
-                onClick = { onAnswerSelected(index) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = colors[index].copy(alpha = 0.7f)
-                )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = option,
-                        fontWeight = FontWeight.Bold
-                    )
-                    // 丑陋的ui 后续更改
-                    Text(
-                        text = when(index) {
-                            0 -> "😞"
-                            1 -> "😐"
-                            2 -> "🙂"
-                            3 -> "😊"
-                            4 -> "😄"
-                            else -> ""
-                        },
-                        fontSize = 24.sp
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        TextButton(onClick = { /* Voice input would be implemented here */ }) {
-            Text("Or use voice input instead")
-        }
-
-        TextButton(onClick = { /* Text input would be implemented here */ }) {
-            Text("Or write how you feel")
-        }
-    }
-}
-
-@Composable
-fun StatsScreen(paddingValues: PaddingValues) {
-    // This would show charts and statistics in the future
-    Column(
-        modifier = Modifier
-            .padding(paddingValues)
-            .padding(16.dp)
-            .fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "Mood Statistics",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        Text(
-            text = "This feature will be available in the next update!",
-            textAlign = TextAlign.Center
-        )
-
-        // Placeholder for future charts
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(200.dp)
-                .padding(16.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("Mood trends will appear here")
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun MoodSelectionGrid(
-    onMoodSelected: (String) -> Unit,
-    selectedMood: String?
-) {
-    val moods = listOf(
-        "Happy" to Color(0xFF4CAF50),
-        "Calm" to Color(0xFF2196F3),
-        "Sad" to Color(0xFF9C27B0),
-        "Angry" to Color(0xFFF44336),
-        "Anxious" to Color(0xFFFF9800),
-        "Tired" to Color(0xFF795548)
-    )
-
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        items(moods) { (mood, color) ->
-            val isSelected = selectedMood == mood
-
-            Card(
-                onClick = { onMoodSelected(mood) },
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isSelected) color else color.copy(alpha = 0.3f)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(100.dp)
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Text(
-                        text = mood,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isSelected) Color.White else Color.Black
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SongItem(song: Song) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Song cover placeholder
-            Box(
-                modifier = Modifier
-                    .size(60.dp)
-                    .background(Color.LightGray),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("🎵")
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // Song info
-            Column {
-                Text(
-                    text = song.title,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = song.artist,
-                    color = Color.Gray
-                )
-
-                if (song.genre != null) {
-                    Text(
-                        text = song.genre,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-        }
-    }
-}
-
-// Data model and helper functions
-data class Song(
-    val title: String,
-    val artist: String,
-    val coverUrl: String? = null,
-    val genre: String? = null
-)
-
-// Mock function for music recommendations
-fun getMockRecommendations(mood: String): List<Song> {
-    return when (mood.lowercase()) {
-        "happy" -> listOf(
-            Song("Happy", "Pharrell Williams", genre = "Pop"),
-            Song("Can't Stop the Feeling!", "Justin Timberlake", genre = "Pop"),
-            Song("Walking on Sunshine", "Katrina & The Waves", genre = "Rock"),
-            Song("Good as Hell", "Lizzo", genre = "Pop"),
-            Song("Uptown Funk", "Mark Ronson ft. Bruno Mars", genre = "Funk")
-        )
-        "sad" -> listOf(
-            Song("Someone Like You", "Adele", genre = "Pop"),
-            Song("Fix You", "Coldplay", genre = "Alternative"),
-            Song("The Night We Met", "Lord Huron", genre = "Indie"),
-            Song("When the Party's Over", "Billie Eilish", genre = "Pop"),
-            Song("Falling", "Harry Styles", genre = "Pop")
-        )
-        "calm" -> listOf(
-            Song("Weightless", "Marconi Union", genre = "Ambient"),
-            Song("Claire de Lune", "Claude Debussy", genre = "Classical"),
-            Song("Breathe Me", "Sia", genre = "Pop"),
-            Song("Yellow", "Coldplay", genre = "Alternative"),
-            Song("Pure Shores", "All Saints", genre = "Pop")
-        )
-        "angry" -> listOf(
-            Song("Break Stuff", "Limp Bizkit", genre = "Nu Metal"),
-            Song("Bulls on Parade", "Rage Against the Machine", genre = "Rock"),
-            Song("Du Hast", "Rammstein", genre = "Industrial Metal"),
-            Song("Killing in the Name", "Rage Against the Machine", genre = "Rock"),
-            Song("Bodies", "Drowning Pool", genre = "Nu Metal")
-        )
-        "anxious" -> listOf(
-            Song("Breathe", "Pink Floyd", genre = "Progressive Rock"),
-            Song("Breathe Me", "Sia", genre = "Pop"),
-            Song("Everybody's Changing", "Keane", genre = "Alternative"),
-            Song("Unsteady", "X Ambassadors", genre = "Alternative"),
-            Song("Fix You", "Coldplay", genre = "Alternative")
-        )
-        "tired" -> listOf(
-            Song("Fade Into You", "Mazzy Star", genre = "Dream Pop"),
-            Song("Asleep", "The Smiths", genre = "Indie"),
-            Song("Sleep", "Eric Whitacre", genre = "Classical"),
-            Song("I'm So Tired...", "Lauv & Troye Sivan", genre = "Pop"),
-            Song("Tired", "Alan Walker", genre = "Electronic")
-        )
-        else -> listOf(
-            Song("Imagine", "John Lennon", genre = "Rock"),
-            Song("What a Wonderful World", "Louis Armstrong", genre = "Jazz"),
-            Song("Here Comes the Sun", "The Beatles", genre = "Rock"),
-            Song("Somewhere Over the Rainbow", "Israel Kamakawiwo'ole", genre = "Folk"),
-            Song("Don't Worry Be Happy", "Bobby McFerrin", genre = "Jazz")
-        )
-    }
-}
-
-// Mock function for music search
-fun searchMusic(query: String): List<Song> {
-    // Mock music library for search functionality
-    val mockMusicLibrary = listOf(
-        Song("Shape of You", "Ed Sheeran", genre = "Pop"),
-        Song("Blinding Lights", "The Weeknd", genre = "Synth-pop"),
-        Song("Dance Monkey", "Tones and I", genre = "Dance-pop"),
-        Song("Someone You Loved", "Lewis Capaldi", genre = "Pop"),
-        Song("Bad Guy", "Billie Eilish", genre = "Electropop"),
-        Song("Watermelon Sugar", "Harry Styles", genre = "Pop rock"),
-        Song("Don't Start Now", "Dua Lipa", genre = "Nu-disco"),
-        Song("Circles", "Post Malone", genre = "Pop"),
-        Song("Everything I Wanted", "Billie Eilish", genre = "Electropop"),
-        Song("Memories", "Maroon 5", genre = "Pop"),
-        Song("Before You Go", "Lewis Capaldi", genre = "Pop"),
-        Song("Adore You", "Harry Styles", genre = "Pop rock"),
-        Song("Lose You To Love Me", "Selena Gomez", genre = "Pop"),
-        Song("Señorita", "Shawn Mendes, Camila Cabello", genre = "Pop"),
-        Song("My Oh My", "Camila Cabello ft. DaBaby", genre = "Pop")
-    )
-
-    return if (query.isBlank()) {
-        emptyList()
-    } else {
-        mockMusicLibrary.filter { song ->
-            song.title.contains(query, ignoreCase = true) ||
-                    song.artist.contains(query, ignoreCase = true) ||
-                    (song.genre?.contains(query, ignoreCase = true) ?: false)
-        }
-    }
-}
-
-// Helper function for mood-based motivational texts
-fun getMoodMotivationalText(mood: String?): String {
-    return when (mood?.lowercase()) {
-        "happy" -> "Keep that positive energy flowing! Music can help sustain your joy."
-        "sad" -> "It's okay to feel down sometimes. These songs will help you process your emotions."
-        "calm" -> "Maintain your peaceful state with these gentle melodies."
-        "angry" -> "Channel that energy with these powerful tracks."
-        "anxious" -> "Take a deep breath. These songs can help ease your mind."
-        "tired" -> "Find your second wind with these carefully selected tunes."
-        else -> "Music has the power to transform your day. Enjoy these recommendations!"
     }
 }
