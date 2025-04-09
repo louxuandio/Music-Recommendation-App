@@ -1,10 +1,13 @@
 package com.example.moodmelody
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,13 +28,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext           // 关键: 导入LocalContext
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.core.app.ActivityCompat
 import com.example.moodmelody.network.RetrofitClient
 import com.example.moodmelody.ui.SongPlayer
 import com.example.moodmelody.viewmodel.MusicViewModel
@@ -125,11 +129,27 @@ fun MoodSelectionGrid(
 class MainActivity : ComponentActivity() {
     private lateinit var musicViewModel: MusicViewModel
 
+    // 位置权限请求启动器
+    private val locationPermissionRequest = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val locationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+
+        if (locationGranted) {
+            // 权限获取成功，重新加载天气
+            musicViewModel.loadWeather()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         // 获取ViewModel实例
         musicViewModel = (application as MoodMelodyApp).musicViewModel
+
+        // 请求位置权限
+        requestLocationPermissions()
 
         // 处理Spotify认证返回的Token(如果有)
         handleSpotifyAuthentication(intent)
@@ -143,6 +163,26 @@ class MainActivity : ComponentActivity() {
                     MoodMelodyApp(musicViewModel)
                 }
             }
+        }
+    }
+
+    private fun requestLocationPermissions() {
+        // 检查是否已经有位置权限
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            // 请求位置权限
+            locationPermissionRequest.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
         }
     }
 
@@ -177,7 +217,6 @@ fun MoodMelodyApp(viewModel: MusicViewModel) {
     var selectedTab by remember { mutableStateOf(0) }
 
     // 1) 判断当前是否有Token
-    // 在MoodMelodyApp composable中的这行
     var hasSpotifyToken by remember {
         mutableStateOf(RetrofitClient.hasToken())
     }
@@ -187,6 +226,9 @@ fun MoodMelodyApp(viewModel: MusicViewModel) {
     val errorMessage by viewModel.errorMessage.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
     val recommendations by viewModel.recommendations.collectAsState()
+
+    // 获取天气数据
+    val currentWeather by viewModel.currentWeather.collectAsState()
 
     // 播放器中的当前歌曲
     val currentSong by viewModel.currentSong.collectAsState()
@@ -203,8 +245,22 @@ fun MoodMelodyApp(viewModel: MusicViewModel) {
     var currentTestQuestion by remember { mutableStateOf(0) }
     var testAnswers by remember { mutableStateOf(listOf<Int>()) }
 
-    // 模拟天气
-    val currentWeather = "Sunny, 72°F"
+    // 格式化天气显示
+    val weatherDisplay = if (currentWeather != null) {
+        val weatherEmoji = when {
+            currentWeather!!.icon.startsWith("1") -> "☀️" // 晴天
+            currentWeather!!.icon.startsWith("3") -> "🌥️" // 多云
+            currentWeather!!.icon.startsWith("4") -> "☁️" // 阴天
+            currentWeather!!.icon.startsWith("5") -> "🌧️" // 雨天
+            currentWeather!!.icon.startsWith("6") -> "❄️" // 雪
+            currentWeather!!.icon.startsWith("7") -> "🌫️" // 雾霾
+            currentWeather!!.icon.startsWith("8") -> "🌪️" // 风暴
+            else -> "🌈" // 其他
+        }
+        "$weatherEmoji ${currentWeather!!.text}, ${currentWeather!!.temp}°C"
+    } else {
+        "Loading weather..."
+    }
 
     Scaffold(
         topBar = {
@@ -273,7 +329,7 @@ fun MoodMelodyApp(viewModel: MusicViewModel) {
                                 start = paddingValues.calculateStartPadding(LayoutDirection.Ltr),
                                 end = paddingValues.calculateEndPadding(LayoutDirection.Ltr)
                             ),
-                            currentWeather = currentWeather,
+                            currentWeather = weatherDisplay,  // 使用格式化后的天气信息
                             selectedMood = selectedMood,
                             moodIntensity = moodIntensity,
                             showMusicRecommendations = showMusicRecommendations,
@@ -283,9 +339,11 @@ fun MoodMelodyApp(viewModel: MusicViewModel) {
                             onMoodSelected = { mood -> selectedMood = mood },
                             onIntensityChanged = { intensity -> moodIntensity = intensity },
                             onGetRecommendations = {
+                                // 传递当前天气信息到推荐函数
                                 viewModel.getRecommendations(
                                     mood = selectedMood ?: "neutral",
-                                    intensity = moodIntensity
+                                    intensity = moodIntensity,
+                                    weather = currentWeather
                                 )
                                 showMusicRecommendations = true
                             },
