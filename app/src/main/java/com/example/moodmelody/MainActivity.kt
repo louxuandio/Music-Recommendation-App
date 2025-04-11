@@ -1,13 +1,18 @@
 package com.example.moodmelody
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.icu.text.SimpleDateFormat
 import android.net.Uri
 import android.os.Bundle
+import android.widget.CalendarView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -27,18 +32,29 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import com.example.moodmelody.network.RetrofitClient
 import com.example.moodmelody.ui.SongPlayer
 import com.example.moodmelody.viewmodel.MusicViewModel
+import java.io.FileNotFoundException
+import java.util.Calendar
+import java.util.Locale
+import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.ui.text.TextStyle
+
 
 /**
  * 数据类Song(若已在其它地方定义，可去掉这里)
@@ -53,6 +69,57 @@ data class Song(
 )
 
 // ==================== 其他Compose示例 ====================
+@Composable
+fun MoodSliderWithGradient(
+    moodIndex: Float,
+    onMoodChange: (Float) -> Unit
+) {
+    val gradientColors = listOf(
+        Color(0xFFE53935), // Red
+        Color(0xFFFB8C00), // Orange
+        Color(0xFFFFEB3B), // Yellow
+        Color(0xFF8BC34A), // Light Green
+        Color(0xFF43A047)  // Green
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth(0.8f)
+            .height(8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // 背景 gradient bar
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .align(Alignment.Center)
+        ) {
+            drawRoundRect(
+                brush = Brush.horizontalGradient(gradientColors),
+                cornerRadius = CornerRadius(100f, 100f)
+            )
+        }
+
+        // 叠加的透明轨道 slider
+        Slider(
+            value = moodIndex,
+            onValueChange = onMoodChange,
+            valueRange = 0f..4f,
+            steps = 3,
+            modifier = Modifier
+                .fillMaxSize()
+                .height(8.dp)
+                .align(Alignment.Center), // 关键点：对齐中线
+            colors = SliderDefaults.colors(
+                thumbColor = Color(0xFF5E35B1),
+                activeTrackColor = Color.Transparent,
+                inactiveTrackColor = Color.Transparent
+            )
+        )
+    }
+}
+
 
 @Composable
 fun MoodTestScreen(
@@ -60,19 +127,135 @@ fun MoodTestScreen(
     currentQuestion: Int,
     onAnswerSelected: (Int) -> Unit
 ) {
-    Box(
+    var currentPage by remember { mutableStateOf(1) }
+    var moodIndex by remember { mutableStateOf(2f) }
+    var selectedKeywords by remember { mutableStateOf(listOf<String>()) }
+    var selectedActivity by remember { mutableStateOf<String?>(null) }
+    var textNote by remember { mutableStateOf("") }
+
+    Column(
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .padding(paddingValues),
-        contentAlignment = Alignment.Center
+        verticalArrangement = Arrangement.SpaceBetween,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = "Question #$currentQuestion", fontSize = 24.sp)
-            Spacer(modifier = Modifier.height(16.dp))
-            // 假设答案只有五个选项
-            for (i in 1..5) {
-                Button(onClick = { onAnswerSelected(i) }, modifier = Modifier.padding(4.dp)) {
-                    Text("Answer $i")
+        when (currentPage) {
+            1 -> MoodSliderPage()
+            2 -> KeywordSelectPage(
+                selectedKeywords = selectedKeywords,
+                onKeywordToggle = { keyword ->
+                    selectedKeywords = if (selectedKeywords.contains(keyword)) {
+                        selectedKeywords - keyword
+                    } else {
+                        selectedKeywords + keyword
+                    }
+                }
+            )
+            3 -> CustomInputPage(
+                selectedActivity = selectedActivity,
+                onActivitySelected = { selectedActivity = it }
+            )
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            OutlinedTextField(
+                value = textNote,
+                onValueChange = { textNote = it },
+                label = { Text("Anything you'd like to add?") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(80.dp)
+                    .padding(vertical = 8.dp, horizontal = 16.dp)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Button(
+                    onClick = { if (currentPage > 1) currentPage-- },
+                    enabled = currentPage > 1
+                ) {
+                    Text("Previous")
+                }
+
+                Button(
+                    onClick = {
+                        if (currentPage < 3) currentPage++
+                        else {
+                            // View Result Action
+                        }
+                    }
+                ) {
+                    Text(if (currentPage == 3) "View Result" else "Next")
+                }
+            }
+        }
+    }
+
+
+}
+@Composable
+fun MoodSliderPage(){
+    var moodIndex by remember { mutableStateOf(2f) }  // 默认中间
+
+    val emojiList = listOf(
+        R.drawable.emoji_fixed_1,
+        R.drawable.emoji_fixed_2,
+        R.drawable.emoji_fixed_3,
+        R.drawable.emoji_fixed_4,
+        R.drawable.emoji_fixed_5
+    )
+    Text(text = "How are you feeling today?",
+        style = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold),
+        modifier = Modifier.padding(top = 16.dp)
+    )
+
+    Image(
+        painter = painterResource(id = emojiList[moodIndex.toInt()]),
+        contentDescription = null,
+        modifier = Modifier.size(360.dp)
+    )
+
+    Spacer(modifier = Modifier.height(32.dp))
+
+    MoodSliderWithGradient(
+        moodIndex = moodIndex,
+        onMoodChange = { moodIndex = it }
+    )
+
+}
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun KeywordSelectPage(
+    selectedKeywords: List<String>,
+    onKeywordToggle: (String) -> Unit
+) {
+    val keywords = listOf("Anxious", "Excited", "Tired", "Focused", "Overwhelmed")
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Pick some words that describe your mood", style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.height(16.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            keywords.forEach { keyword ->
+                val isSelected = selectedKeywords.contains(keyword)
+                Button(
+                    onClick = { onKeywordToggle(keyword) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSelected) Color(0xFF5E35B1) else Color.LightGray
+                    )
+                ) {
+                    Text(keyword)
                 }
             }
         }
@@ -80,16 +263,33 @@ fun MoodTestScreen(
 }
 
 @Composable
-fun StatsScreen(paddingValues: PaddingValues) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text = "Stats Screen (未实现)")
+fun CustomInputPage(
+    selectedActivity: String?,
+    onActivitySelected: (String) -> Unit
+) {
+    val activities = listOf("Dancing", "Singing", "Playing in the rain", "Sleeping", "Screaming into the void")
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("What do you feel like doing now?", style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.height(16.dp))
+
+        activities.forEach { activity ->
+            Button(
+                onClick = { onActivitySelected(activity) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (activity == selectedActivity) Color(0xFF5E35B1) else Color.LightGray
+                ),
+                modifier = Modifier
+                    .padding(vertical = 4.dp)
+                    .fillMaxWidth(0.8f)
+            ) {
+                Text(activity)
+            }
+        }
     }
 }
+
+
 
 @Composable
 fun MoodSelectionGrid(
@@ -350,6 +550,7 @@ fun MoodMelodyApp(viewModel: MusicViewModel) {
                             onBackToMoodSelection = { showMusicRecommendations = false },
                             onSongClick = { song -> viewModel.playSong(song) }
                         )
+                        //TODO: 随便放几个歌单在这
                     }
                     1 -> {
                         SearchScreen(
@@ -369,9 +570,11 @@ fun MoodMelodyApp(viewModel: MusicViewModel) {
                             },
                             onSongClick = { song -> viewModel.playSong(song) }
                         )
+                        //DONE: 这个 search 文字改一下，有点遮挡
                     }
                     2 -> {
                         // Mood Test Tab
+                        //进行中：设置问题
                         MoodTestScreen(
                             paddingValues = PaddingValues(
                                 top = paddingValues.calculateTopPadding(),
@@ -404,6 +607,7 @@ fun MoodMelodyApp(viewModel: MusicViewModel) {
                         )
                     }
                     3 -> {
+                        //TODO：calendar view + 心情日记 + 歌曲(optional)
                         // Stats Tab
                         StatsScreen(
                             paddingValues = PaddingValues(
@@ -499,7 +703,7 @@ fun SearchScreen(
             modifier = Modifier.fillMaxWidth(),
             trailingIcon = {
                 IconButton(onClick = onSearch) {
-                    Text("Search")
+                    Icon(imageVector = Icons.Default.Search, contentDescription = "Search")
                 }
             }
         )
@@ -738,6 +942,109 @@ fun HomeScreen(
                     Text("Write Mood Journal")
                 }
             }
+        }
+    }
+}
+
+
+//从日记 app复制过来的 read/save/delete file
+//⚠️这个用的是 internal storage
+// Function to save text to internal storage
+fun saveToFile(context: Context, filename: String, content: String) {
+    // MODE_PRIVATE means the file is only accessible to this app
+    context.openFileOutput(filename, Context.MODE_PRIVATE).use { outputStream ->
+        outputStream.write(content.toByteArray())
+    }
+}
+
+// Function to read text from internal storage
+fun readFromFile(context: Context, filename: String): String {
+    return try {
+        context.openFileInput(filename).bufferedReader().useLines { lines ->
+            lines.joinToString("\n")
+        }
+    } catch (e: FileNotFoundException) {
+        "File not found"
+    }
+}
+
+// Function to delete file from internal storage
+fun deleteFile(context: Context, filename: String): Boolean {
+    return context.deleteFile(filename)
+}
+
+@Composable
+fun StatsScreen(paddingValues: PaddingValues) {
+    val context = LocalContext.current
+    val sdf = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
+    var selectedDate by remember { mutableStateOf(sdf.format(java.util.Date())) }
+    var diaryText by remember { mutableStateOf("") }
+    var statusMessage by remember { mutableStateOf("") }
+    var fontSize by remember { mutableStateOf(16.sp) }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues),
+        contentAlignment = Alignment.Center
+    ) {
+        LaunchedEffect(selectedDate) {
+            val fileName = "$selectedDate.txt"
+            val content = readFromFile(context, fileName)
+            diaryText = content
+            statusMessage = "Loaded $fileName"
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            AndroidView(
+                factory = { ctx ->
+                    CalendarView(ctx).apply {
+                        setOnDateChangeListener { _, year, month, dayOfMonth ->
+                            val cal = Calendar.getInstance().apply {
+                                set(year, month, dayOfMonth)
+                            }
+                            selectedDate = sdf.format(cal.time)
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(300.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+            OutlinedTextField(
+                value = diaryText,
+                onValueChange = { diaryText = it },
+                label = { Text("Your diary for $selectedDate") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = fontSize)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = {
+                    val fileName = "$selectedDate.txt"
+                    saveToFile(context, fileName, diaryText)
+                    statusMessage = "Saved to $fileName"
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Store")
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text("Status: $statusMessage")
+
+            //TODO：有过记录的日子，日期加颜色（表示心情）
+            //TODO：有记录的日子，显示日记 AND 那天的推荐歌单 AND 那天的天气
         }
     }
 }
