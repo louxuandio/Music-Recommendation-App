@@ -8,6 +8,7 @@ import android.content.res.Configuration
 import android.icu.text.SimpleDateFormat
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.widget.CalendarView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,6 +16,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -59,6 +61,8 @@ import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.TextStyle
+import com.example.moodmelody.data.MoodEntry
+import java.util.Date
 
 
 /**
@@ -130,7 +134,8 @@ fun MoodSliderWithGradient(
 fun MoodTestScreen(
     paddingValues: PaddingValues,
     currentQuestion: Int,
-    onAnswerSelected: (Int) -> Unit
+    onAnswerSelected: (Int) -> Unit,
+    viewModel: MusicViewModel
 ) {
     var currentPage by remember { mutableStateOf(1) }
     var moodIndex by remember { mutableStateOf(2f) }
@@ -138,6 +143,10 @@ fun MoodTestScreen(
     var selectedActivity by remember { mutableStateOf<String?>(null) }
     var textNote by remember { mutableStateOf("") }
     val isPortrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
+    val context = LocalContext.current
+
+    val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+
 
     if (isPortrait){
         Column(
@@ -148,7 +157,7 @@ fun MoodTestScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             when (currentPage) {
-                1 -> MoodSliderPage()
+                1 -> {MoodSliderPage(moodIndex = moodIndex, onMoodChange = { moodIndex = it })}
                 2 -> KeywordSelectPage(
                     selectedKeywords = selectedKeywords,
                     onKeywordToggle = { keyword ->
@@ -195,7 +204,17 @@ fun MoodTestScreen(
                         onClick = {
                             if (currentPage < 3) currentPage++
                             else {
-                                // View Result Action
+                                // 最后一页点击"View Result"时，构造最新 entry 并保存
+                                val entry = MoodEntry(
+                                    date = today,
+                                    moodIndex = moodIndex,
+                                    keywords = selectedKeywords,
+                                    activity = selectedActivity,
+                                    note = textNote // 此时确保用户输入的内容已经更新到 textNote 里
+                                )
+                                viewModel.saveMoodEntry(entry)
+                                // 可根据需要添加提示或者跳转
+                                Log.d("MoodTest", "Saving entry for date: $today")
                             }
                         }
                     ) {
@@ -300,7 +319,7 @@ fun LandscapeTestScreen(
                 .padding(end = 16.dp)
         ) {
             when (selectedStep) {
-                0 -> MoodSliderPage()
+                0 -> MoodSliderPage(moodIndex = moodIndex, onMoodChange = onMoodChange)
                 1 -> KeywordSelectPage(
                     selectedKeywords = selectedKeywords,
                     onKeywordToggle = onKeywordToggle
@@ -331,9 +350,10 @@ fun LandscapeTestScreen(
 }
 
 @Composable
-fun MoodSliderPage(){
-    var moodIndex by remember { mutableStateOf(2f) }  // 默认中间
-
+fun MoodSliderPage(
+    moodIndex: Float,
+    onMoodChange: (Float) -> Unit
+){
     val emojiList = listOf(
         R.drawable.emoji_fixed_1,
         R.drawable.emoji_fixed_2,
@@ -356,7 +376,7 @@ fun MoodSliderPage(){
 
     MoodSliderWithGradient(
         moodIndex = moodIndex,
-        onMoodChange = { moodIndex = it }
+        onMoodChange = onMoodChange
     )
 
 }
@@ -698,7 +718,8 @@ fun MoodMelodyApp(viewModel: MusicViewModel) {
                                     currentTestQuestion = 0
                                     testAnswers = listOf()
                                 }
-                            }
+                            },
+                            viewModel = viewModel
                         )
                     }
                     3 -> {
@@ -709,7 +730,8 @@ fun MoodMelodyApp(viewModel: MusicViewModel) {
                                         if (currentSong != null) 80.dp else 0.dp,
                                 start = paddingValues.calculateStartPadding(LayoutDirection.Ltr),
                                 end = paddingValues.calculateEndPadding(LayoutDirection.Ltr)
-                            )
+                            ),
+                            viewModel = viewModel
                         )
                     }
                 }
@@ -1214,30 +1236,14 @@ fun saveToFile(context: Context, filename: String, content: String) {
     }
 }
 
-// Function to read text from internal storage
-fun readFromFile(context: Context, filename: String): String {
-    return try {
-        context.openFileInput(filename).bufferedReader().useLines { lines ->
-            lines.joinToString("\n")
-        }
-    } catch (e: FileNotFoundException) {
-        "File not found"
-    }
-}
-
-// Function to delete file from internal storage
-fun deleteFile(context: Context, filename: String): Boolean {
-    return context.deleteFile(filename)
-}
 
 @Composable
-fun StatsScreen(paddingValues: PaddingValues) {
-    val context = LocalContext.current
+fun StatsScreen(paddingValues: PaddingValues,viewModel: MusicViewModel) {
     val sdf = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
-    var selectedDate by remember { mutableStateOf(sdf.format(java.util.Date())) }
+    var selectedDate by remember { mutableStateOf(sdf.format(Date())) }
+    val loadedEntry by viewModel.loadedEntry.collectAsState()
     var diaryText by remember { mutableStateOf("") }
-    var statusMessage by remember { mutableStateOf("") }
-    var fontSize by remember { mutableStateOf(16.sp) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1245,10 +1251,25 @@ fun StatsScreen(paddingValues: PaddingValues) {
         contentAlignment = Alignment.Center
     ) {
         LaunchedEffect(selectedDate) {
-            val fileName = "$selectedDate.txt"
-            val content = readFromFile(context, fileName)
-            diaryText = content
-            statusMessage = "Loaded $fileName"
+            viewModel.loadEntryByDate(selectedDate)
+            Log.d("StatsScreen", "Loading entry for date: $selectedDate")
+        }
+
+        LaunchedEffect(loadedEntry) {
+            diaryText = if (loadedEntry != null) {
+                val entry = loadedEntry!!
+                """
+            Date: ${entry.date}
+            Mood Index: ${entry.moodIndex}
+            Keywords: ${entry.keywords.joinToString(", ")}
+            Activity: ${entry.activity ?: "None"}
+            Note: ${entry.note}
+            """.trimIndent()
+            } else {
+                "No record found for $selectedDate"
+            }
+            Log.d("StatsScreen", "Loaded note: $diaryText")
+
         }
 
         Column(
@@ -1260,6 +1281,7 @@ fun StatsScreen(paddingValues: PaddingValues) {
                 factory = { ctx ->
                     CalendarView(ctx).apply {
                         setOnDateChangeListener { _, year, month, dayOfMonth ->
+                            // 月份从 0 开始，这里直接用 Calendar 格式化成 yyyy-MM-dd
                             val cal = Calendar.getInstance().apply {
                                 set(year, month, dayOfMonth)
                             }
@@ -1272,33 +1294,26 @@ fun StatsScreen(paddingValues: PaddingValues) {
                     .height(300.dp)
             )
 
+
             Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(
-                value = diaryText,
-                onValueChange = { diaryText = it },
-                label = { Text("Your diary for $selectedDate") },
+            Text(
+                text = diaryText,
+                style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
-                textStyle = androidx.compose.ui.text.TextStyle(fontSize = fontSize)
+                    .padding(8.dp)
+                    .border(1.dp, Color.LightGray)
+                    .padding(8.dp)
             )
 
+
             Spacer(modifier = Modifier.height(8.dp))
 
-            Button(
-                onClick = {
-                    val fileName = "$selectedDate.txt"
-                    saveToFile(context, fileName, diaryText)
-                    statusMessage = "Saved to $fileName"
-                },
+            Text(
+                text = "Your recommended music for $selectedDate is: ...",
+                style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Store")
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text("Status: $statusMessage")
+            )
 
             //TODO：有过记录的日子，日期加颜色（表示心情）
             //TODO：有记录的日子，显示日记 AND 那天的推荐歌单 AND 那天的天气

@@ -11,6 +11,9 @@ import com.example.moodmelody.repository.WeatherRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import com.example.moodmelody.data.MoodDatabase
+import com.example.moodmelody.data.MoodEntry
+import android.app.Application
 
 class MusicViewModel(
     private val spotifyRepository: SpotifyRepository,
@@ -18,6 +21,10 @@ class MusicViewModel(
     private val playerManager: SpotifyPlayerManager,
     private val applicationContext: Context
 ) : ViewModel() {
+
+    private val dao = MoodDatabase.getDatabase(applicationContext).moodEntryDao()
+    private val _loadedEntry = MutableStateFlow<MoodEntry?>(null)
+    val loadedEntry: StateFlow<MoodEntry?> = _loadedEntry
 
     private val _searchResults = MutableStateFlow<List<Song>>(emptyList())
     val searchResults: StateFlow<List<Song>> = _searchResults
@@ -159,5 +166,17 @@ class MusicViewModel(
     override fun onCleared() {
         super.onCleared()
         playerManager.disconnect()
+    }
+
+
+    fun saveMoodEntry(entry: MoodEntry) {
+        viewModelScope.launch {
+            dao.insert(entry)
+        }
+    }
+    fun loadEntryByDate(date: String) {
+        viewModelScope.launch {
+            _loadedEntry.value = dao.getEntryByDate(date)
+        }
     }
 }
