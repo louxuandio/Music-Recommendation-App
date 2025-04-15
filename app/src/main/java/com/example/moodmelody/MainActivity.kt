@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.icu.text.SimpleDateFormat
 import android.net.Uri
 import android.os.Bundle
@@ -53,6 +54,10 @@ import java.util.Calendar
 import java.util.Locale
 import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.EmojiEmotions
+import androidx.compose.material.icons.filled.Tag
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.TextStyle
 
 
@@ -132,74 +137,199 @@ fun MoodTestScreen(
     var selectedKeywords by remember { mutableStateOf(listOf<String>()) }
     var selectedActivity by remember { mutableStateOf<String?>(null) }
     var textNote by remember { mutableStateOf("") }
+    val isPortrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(paddingValues),
-        verticalArrangement = Arrangement.SpaceBetween,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        when (currentPage) {
-            1 -> MoodSliderPage()
-            2 -> KeywordSelectPage(
-                selectedKeywords = selectedKeywords,
-                onKeywordToggle = { keyword ->
-                    selectedKeywords = if (selectedKeywords.contains(keyword)) {
-                        selectedKeywords - keyword
-                    } else {
-                        selectedKeywords + keyword
-                    }
-                }
-            )
-            3 -> CustomInputPage(
-                selectedActivity = selectedActivity,
-                onActivitySelected = { selectedActivity = it }
-            )
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
+    if (isPortrait){
         Column(
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(paddingValues),
+            verticalArrangement = Arrangement.SpaceBetween,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            OutlinedTextField(
-                value = textNote,
-                onValueChange = { textNote = it },
-                label = { Text("Anything you'd like to add?") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(80.dp)
-                    .padding(vertical = 8.dp, horizontal = 16.dp)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Button(
-                    onClick = { if (currentPage > 1) currentPage-- },
-                    enabled = currentPage > 1
-                ) {
-                    Text("Previous")
-                }
-
-                Button(
-                    onClick = {
-                        if (currentPage < 3) currentPage++
-                        else {
-                            // View Result Action
+            when (currentPage) {
+                1 -> MoodSliderPage()
+                2 -> KeywordSelectPage(
+                    selectedKeywords = selectedKeywords,
+                    onKeywordToggle = { keyword ->
+                        selectedKeywords = if (selectedKeywords.contains(keyword)) {
+                            selectedKeywords - keyword
+                        } else {
+                            selectedKeywords + keyword
                         }
                     }
+                )
+                3 -> CustomInputPage(
+                    selectedActivity = selectedActivity,
+                    onActivitySelected = { selectedActivity = it }
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            Column(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = textNote,
+                    onValueChange = { textNote = it },
+                    label = { Text("Anything you'd like to add?") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp)
+                        .padding(vertical = 8.dp, horizontal = 16.dp)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(if (currentPage == 3) "View Result" else "Next")
+                    Button(
+                        onClick = { if (currentPage > 1) currentPage-- },
+                        enabled = currentPage > 1
+                    ) {
+                        Text("Previous")
+                    }
+
+                    Button(
+                        onClick = {
+                            if (currentPage < 3) currentPage++
+                            else {
+                                // View Result Action
+                            }
+                        }
+                    ) {
+                        Text(if (currentPage == 3) "View Result" else "Next")
+                    }
                 }
             }
         }
     }
-
-
+    else {
+        LandscapeTestScreen(
+            selectedStep = currentPage, // 改个名字也行
+            onStepSelected = { currentPage = it },
+            textNote = textNote,
+            onNoteChange = { textNote = it },
+            selectedKeywords = selectedKeywords,
+            onKeywordToggle = { keyword ->
+                selectedKeywords = if (selectedKeywords.contains(keyword)) {
+                    selectedKeywords - keyword
+                } else {
+                    selectedKeywords + keyword
+                }
+            },
+            selectedActivity = selectedActivity,
+            onActivitySelected = { selectedActivity = it },
+            moodIndex = moodIndex,
+            onMoodChange = { moodIndex = it }
+        )
+    }
 }
+
+@Composable
+fun LandscapeTestScreen(
+    selectedStep: Int,
+    onStepSelected: (Int) -> Unit,
+    textNote: String,
+    onNoteChange: (String) -> Unit,
+    selectedKeywords: List<String>,
+    onKeywordToggle: (String) -> Unit,
+    selectedActivity: String?,
+    onActivitySelected: (String) -> Unit,
+    moodIndex: Float,
+    onMoodChange: (Float) -> Unit
+) {
+    val steps = listOf("Mood", "Keyword", "Action")
+    Row(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+
+        // 左侧：步骤选择（可点击切换）
+        Column(
+            modifier = Modifier
+                .width(180.dp)
+                .fillMaxHeight()
+                .background(Color(0xFFF7F7F7)) // 淡灰色背景
+                .padding(vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            steps.forEachIndexed { index, label ->
+                val isSelected = index == selectedStep
+                val backgroundColor = if (isSelected) Color(0xFFD1C4E9) else Color.Transparent
+                val textColor = if (isSelected) Color(0xFF311B92) else Color.Black
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(backgroundColor)
+                        .clickable { onStepSelected(index) }
+                        .padding(start = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = when (index) {
+                            0 -> Icons.Default.EmojiEmotions
+                            1 -> Icons.Default.Tag
+                            else -> Icons.Default.Check
+                        },
+                        contentDescription = null,
+                        tint = textColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(text = label, color = textColor)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Divider(
+                color = Color.LightGray,
+                thickness = 1.dp,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        // 中间内容
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 16.dp)
+        ) {
+            when (selectedStep) {
+                0 -> MoodSliderPage()
+                1 -> KeywordSelectPage(
+                    selectedKeywords = selectedKeywords,
+                    onKeywordToggle = onKeywordToggle
+                )
+                2 -> CustomInputPage(
+                    selectedActivity = selectedActivity,
+                    onActivitySelected = onActivitySelected
+                )
+            }
+        }
+
+        // 右侧：文字输入栏
+        Column(
+            modifier = Modifier.width(280.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            OutlinedTextField(
+                value = textNote,
+                onValueChange = onNoteChange,
+                label = { Text("Anything you'd like to add?") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(80.dp),
+                singleLine = false
+            )
+        }
+    }
+}
+
 @Composable
 fun MoodSliderPage(){
     var moodIndex by remember { mutableStateOf(2f) }  // 默认中间
@@ -269,15 +399,15 @@ fun CustomInputPage(
 ) {
     val activities = listOf("Dancing", "Singing", "Playing in the rain", "Sleeping", "Screaming into the void")
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("What do you feel like doing now?", style = MaterialTheme.typography.titleMedium)
-        Spacer(modifier = Modifier.height(16.dp))
-
-        activities.forEach { activity ->
+    LazyColumn(horizontalAlignment = Alignment.CenterHorizontally) {
+        item { Text("What do you feel like doing now?", style = MaterialTheme.typography.titleMedium) }
+        item { Spacer(modifier = Modifier.height(16.dp)) }
+        items(activities) { activity ->
             Button(
                 onClick = { onActivitySelected(activity) },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (activity == selectedActivity) Color(0xFF5E35B1) else Color.LightGray
+                    containerColor = if (activity == selectedActivity)
+                        Color(0xFF5E35B1) else Color.LightGray
                 ),
                 modifier = Modifier
                     .padding(vertical = 4.dp)
@@ -462,44 +592,9 @@ fun MoodMelodyApp(viewModel: MusicViewModel) {
         "Loading weather..."
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("MoodMelody") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
-        },
-        bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
-                    label = { Text("Home") },
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 }
-                )
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Search, contentDescription = "Search") },
-                    label = { Text("Search") },
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 }
-                )
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Star, contentDescription = "Test") },
-                    label = { Text("Test") },
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 }
-                )
-                NavigationBarItem(
-                    icon = { Icon(Icons.Outlined.Info, contentDescription = "Stats") },
-                    label = { Text("Stats") },
-                    selected = selectedTab == 3,
-                    onClick = { selectedTab = 3 }
-                )
-            }
-        }
+    AdaptiveScaffold(
+        selectedTab = selectedTab,
+        onTabSelected = { selectedTab = it }
     ) { paddingValues ->
         // 3) 如果还没有 Token，就显示一个登录按钮
         if (!hasSpotifyToken) {
@@ -607,8 +702,6 @@ fun MoodMelodyApp(viewModel: MusicViewModel) {
                         )
                     }
                     3 -> {
-                        //TODO：calendar view + 心情日记 + 歌曲(optional)
-                        // Stats Tab
                         StatsScreen(
                             paddingValues = PaddingValues(
                                 top = paddingValues.calculateTopPadding(),
@@ -636,6 +729,109 @@ fun MoodMelodyApp(viewModel: MusicViewModel) {
         }
     }
 }
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AdaptiveScaffold(
+    selectedTab: Int,
+    onTabSelected: (Int) -> Unit,
+    content: @Composable (PaddingValues) -> Unit
+) {
+    val isPortrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
+
+    if (isPortrait) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("MoodMelody") },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                )
+            },
+            bottomBar = {
+                NavigationBar {
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
+                        label = { Text("Home") },
+                        selected = selectedTab == 0,
+                        onClick = { onTabSelected(0) }
+                    )
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+                        label = { Text("Search") },
+                        selected = selectedTab == 1,
+                        onClick = { onTabSelected(1) }
+                    )
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.Star, contentDescription = "Test") },
+                        label = { Text("Test") },
+                        selected = selectedTab == 2,
+                        onClick = { onTabSelected(2) }
+                    )
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Outlined.Info, contentDescription = "Stats") },
+                        label = { Text("Stats") },
+                        selected = selectedTab == 3,
+                        onClick = { onTabSelected(3) }
+                    )
+                }
+            },
+            content = content
+        )
+    } else {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("MoodMelody") },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                )
+            },
+            content = { innerPadding ->
+                Row(modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                ) {
+                    NavigationRail {
+                        NavigationRailItem(
+                            icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
+                            label = { Text("Home") },
+                            selected = selectedTab == 0,
+                            onClick = { onTabSelected(0) }
+                        )
+                        NavigationRailItem(
+                            icon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+                            label = { Text("Search") },
+                            selected = selectedTab == 1,
+                            onClick = { onTabSelected(1) }
+                        )
+                        NavigationRailItem(
+                            icon = { Icon(Icons.Default.Star, contentDescription = "Test") },
+                            label = { Text("Test") },
+                            selected = selectedTab == 2,
+                            onClick = { onTabSelected(2) }
+                        )
+                        NavigationRailItem(
+                            icon = { Icon(Icons.Outlined.Info, contentDescription = "Stats") },
+                            label = { Text("Stats") },
+                            selected = selectedTab == 3,
+                            onClick = { onTabSelected(3) }
+                        )
+                    }
+
+                    // 主内容区域，PaddingValues() 让它和 portrait 保持一致写法
+                    Box(modifier = Modifier.weight(1f)) {
+                        content(PaddingValues())
+                    }
+                }
+            }
+        )
+    }
+}
+
 
 /** 一个单独的Composable来放"Login with Spotify"按钮,用LocalContext获取Context. */
 @Composable
@@ -802,144 +998,205 @@ fun HomeScreen(
     onBackToMoodSelection: () -> Unit,
     onSongClick: (Song) -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .padding(paddingValues)
-            .padding(16.dp)
-            .fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Weather display
-        Card(
+    val isPortrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
+
+    if (isPortrait){
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
+                .padding(paddingValues)
+                .padding(16.dp)
+                .fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            // Weather display
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
             ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Current Weather",
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(text = currentWeather)
+                }
+            }
+
+            if (showMusicRecommendations) {
+                // Recommendations Screen
                 Text(
-                    text = "Current Weather",
-                    fontWeight = FontWeight.Bold
+                    text = "Recommendations For You",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
-                Text(text = currentWeather)
+
+                Text(
+                    text = "Based on your ${selectedMood?.lowercase() ?: "current"} mood",
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                Text(
+                    text = getMoodMotivationalText(selectedMood),
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.padding(16.dp))
+                } else if (errorMessage != null) {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        items(recommendations) { song ->
+                            SongItem(
+                                song = song,
+                                onSongClick = onSongClick
+                            )
+                        }
+                    }
+                }
+
+                Button(
+                    onClick = onBackToMoodSelection,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp)
+                ) {
+                    Text("Change Mood")
+                }
+            } else {
+                // Mood Selection Screen
+                Text(
+                    text = "How are you feeling today?",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                // Mood grid
+                MoodSelectionGrid(
+                    onMoodSelected = onMoodSelected,
+                    selectedMood = selectedMood
+                )
+
+                // Mood intensity slider if mood is selected
+                if (selectedMood != null) {
+                    Text(
+                        text = "Mood Intensity:",
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
+
+                    Slider(
+                        value = moodIntensity.toFloat(),
+                        onValueChange = { onIntensityChanged(it.toInt()) },
+                        valueRange = 1f..5f,
+                        steps = 3,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Mild")
+                        Text("Moderate")
+                        Text("Intense")
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Button(
+                        onClick = onGetRecommendations,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Get Music Recommendations")
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedButton(
+                        onClick = { /* Voice input would be implemented here */ },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Record Voice Note")
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedButton(
+                        onClick = { /* Text diary would be implemented here */ },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Write Mood Journal")
+                    }
+                }
             }
         }
-
-        if (showMusicRecommendations) {
-            // Recommendations Screen
-            Text(
-                text = "Recommendations For You",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            Text(
-                text = "Based on your ${selectedMood?.lowercase() ?: "current"} mood",
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            Text(
-                text = getMoodMotivationalText(selectedMood),
-                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.padding(16.dp))
-            } else if (errorMessage != null) {
-                Text(
-                    text = errorMessage,
-                    color = MaterialTheme.colorScheme.error
+    }
+    else{
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("How are you feeling today?", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                MoodSelectionGrid(
+                    onMoodSelected = onMoodSelected,
+                    selectedMood = selectedMood
                 )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f)
-                ) {
-                    items(recommendations) { song ->
-                        SongItem(
-                            song = song,
-                            onSongClick = onSongClick
-                        )
+                if (selectedMood != null) {
+                    Text("Mood Intensity")
+                    Slider(
+                        value = moodIntensity.toFloat(),
+                        onValueChange = { onIntensityChanged(it.toInt()) },
+                        valueRange = 1f..5f,
+                        steps = 3,
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    )
+                    Button(onClick = onGetRecommendations) {
+                        Text("Get Recommendations")
                     }
                 }
             }
 
-            Button(
-                onClick = onBackToMoodSelection,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp)
+            Column(
+                modifier = Modifier.width(300.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("Change Mood")
-            }
-        } else {
-            // Mood Selection Screen
-            Text(
-                text = "How are you feeling today?",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            // Mood grid
-            MoodSelectionGrid(
-                onMoodSelected = onMoodSelected,
-                selectedMood = selectedMood
-            )
-
-            // Mood intensity slider if mood is selected
-            if (selectedMood != null) {
-                Text(
-                    text = "Mood Intensity:",
-                    modifier = Modifier.padding(top = 16.dp)
-                )
-
-                Slider(
-                    value = moodIntensity.toFloat(),
-                    onValueChange = { onIntensityChanged(it.toInt()) },
-                    valueRange = 1f..5f,
-                    steps = 3,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Mild")
-                    Text("Moderate")
-                    Text("Intense")
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("Current Weather", fontWeight = FontWeight.Bold)
+                        Text(currentWeather)
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = onGetRecommendations,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Get Music Recommendations")
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedButton(
-                    onClick = { /* Voice input would be implemented here */ },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Record Voice Note")
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedButton(
-                    onClick = { /* Text diary would be implemented here */ },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Write Mood Journal")
+                if (showMusicRecommendations) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Recommendations", fontWeight = FontWeight.Bold)
+                    LazyColumn(modifier = Modifier.fillMaxHeight()) {
+                        items(recommendations) { song ->
+                            SongItem(song = song, onSongClick = onSongClick)
+                        }
+                    }
                 }
             }
         }
