@@ -20,7 +20,7 @@ MoodMelody is an intelligent music recommendation application that provides pers
 
 ## Application Screenshots
 
-*(Screenshots can be added here)*
+*(Screenshots will be added here)*
 
 ## How to Use
 
