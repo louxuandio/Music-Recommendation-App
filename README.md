@@ -1,95 +1,64 @@
-# 🎵 Mood Melody – Personalized Music Recommendation Based on Mood & Weather
+# MoodMelody
 
-Mood Melody is a personalized music recommendation app that suggests daily playlists based on a user's current mood and real-time weather conditions. By delivering music tailored to emotional states, the app aims to enhance users’ mental well-being and foster emotional self-awareness.
+MoodMelody is an intelligent music recommendation application that provides personalized music recommendations based on the user's mood, current weather, and personal preferences.
 
----
+## Features
 
-## 🌟 App Concept & Purpose
+- **Mood Analysis**: Analyzes the user's current emotional state based on selected keywords and lyric preferences
+- **Weather Awareness**: Uses location information to get current weather conditions and incorporates weather factors into music recommendations
+- **Personalized Recommendations**: Combines mood, weather, and user history to provide personalized music suggestions
+- **Spotify Integration**: Seamless integration with Spotify API, supporting music playback and control
+- **Elegant Interface**: Modern Material 3 design interface, providing a smooth and intuitive user experience
 
-Music has the power to influence and reflect how we feel. Mood Melody helps users connect with their emotions by recommending music that resonates with both their **inner state** and the **outer world**.
+## Technology Stack
 
-### 🔁 How it works:
-1. **Detect mood** through text input, voice input, or facial expressions.
-2. **Fetch local weather** data via GPS and external weather APIs.
-3. **Recommend music** using a custom algorithm that matches mood + weather context.
-4. **Promote emotional awareness** by helping users reflect on their mood and music preferences.
-5. **Encourage intentional listening** to support mood improvement and mindfulness.
+- Kotlin + Jetpack Compose UI framework
+- MVVM architecture pattern
+- Retrofit for network requests
+- Spotify SDK for music playback
+- Location services and Weather API integration
 
----
+## Application Screenshots
 
-## 🧠 Tentatively Selected APIs, Databases, and Sensors
+*(Screenshots can be added here)*
 
-### 🎭 Mood Capturing
-- **CameraX API**: Capture user facial expressions.
-- **ML Kit API**: Perform on-device face analysis and emotion detection.
-- **Microphone**: Capture voice tone patterns as a secondary mood input.
-- **Text Input**: Optional mood journaling analyzed via AI.
-- **Activity Sensor (Accelerometer)**: Infer user activity level as a supporting mood signal.
+## How to Use
 
-### 🌤️ Weather Integration
-- **GPS**: Detect user location.
-- **OpenWeatherMap API**: Retrieve real-time weather data (temperature, condition, etc.).
+1. **Login**: Sign in with your Spotify account
+2. **Select Mood**: Choose keywords and lyric options on the mood analysis page
+3. **View Recommendations**: The app will provide personalized recommendations based on your mood and current weather
+4. **Enjoy Music**: Play, pause, skip tracks, or save songs to your Spotify library
 
-### 📊 Mood Analyzing
-- **OpenAI GPT API**: Perform sentiment/emotion analysis on user inputs.
-- **NLP**: Enhance multi-dimensional emotion classification (joy, sadness, anger, etc.).
+## Permission Information
 
-### 🗄️ Database (Room)
-- Store mood entries with timestamps
-- Save music preferences and listening history
-- Cache recommended playlists for offline access
-- Track mood-music response data for personalization
+The application requires the following permissions:
+- Internet access: For connecting to Spotify and weather APIs
+- Location permission: For obtaining weather information for the current location
 
-### 🎧 Music API
-- **Spotify Web API**:
-  - Access Spotify’s music library categorized by mood, energy, and tempo
-  - Retrieve audio features (e.g., valence, energy, tempo)
-  - Generate playlists that align with detected moods
+## Development Setup
 
----
+### Requirements
+- Android Studio Arctic Fox or higher
+- JDK 11 or higher
+- Android SDK 31 or higher
 
-## 📱 Target Devices
+### Build Steps
+1. Clone the repository
+   ```
+   git clone https://github.com/yourusername/moodmelody.git
+   ```
+2. Open the project in Android Studio
+3. Configure your Spotify API keys in `gradle.properties`
+4. Build and run the project
 
-### 📲 Primary: Smartphone
-- Main interface for daily interaction
-- Quick mood check-ins and music recommendations
-- On-the-go music playback
-- Camera-based mood detection
+## Contribution Guidelines
 
-### 💻 Secondary: Tablet (Expanded Experience)
-- Mood analytics and visualization dashboard
-- Enhanced playlist creation tools
-- Historical mood-music pattern exploration
-- Guided mindfulness/meditation exercises with music
+Feel free to submit issue reports and feature suggestions. If you want to contribute to the project, please open an issue first to discuss what you would like to change.
 
----
+## License
 
-## 🔧 Tech Stack
+This project is licensed under the [MIT License](LICENSE).
 
-- **Language**: Kotlin
-- **UI Framework**: Jetpack Compose
-- **Database**: Room
-- **Networking**: Retrofit / OkHttp
-- **Permissions**: Camera, Microphone, Location
-- **Sensors**: Camera, Microphone, Accelerometer
+## Contact
 
----
-
-## 🚧 Current Status
-
-> This project is currently under development as a final course project.  
-We have tentatively selected the technologies and tools listed above, which may evolve during implementation.
-
----
-
-## 🤝 Contributors
-
-- Xuan Lou
-- Zhengkai Li
-
----
-
-## 📌 License
-
-[MIT License](LICENSE) 
-
+If you have any questions or suggestions, please contact us through [issues](https://github.com/yourusername/moodmelody/issues). 
