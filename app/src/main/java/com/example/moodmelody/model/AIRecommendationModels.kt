@@ -1,17 +1,6 @@
 package com.example.moodmelody.model
 
 /**
- * 用户情感和环境数据，作为AI推荐的输入
- */
-data class UserData(
-    val moodScore: Float,        // 0~100
-    val keywords: List<String>,  // e.g. ["rain","loneliness"]
-    val lyric: String,           // 用户选中的歌词
-    val weather: String,         // e.g. "Rain","Clear"
-    val matchMood: Boolean = false // Whether to match mood (true) or provide mood-lifting music (false)
-)
-
-/**
  * AI推荐结果
  */
 data class Recommendation(

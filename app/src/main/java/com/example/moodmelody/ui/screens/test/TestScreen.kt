@@ -348,7 +348,7 @@ fun CustomTestScreen(
                         },
                         enabled = when (currentPage) {
                             2 -> selectedKeywords.isNotEmpty()
-                            3 -> selectedLyric != null
+                            3 -> selectedLyric != null && false // 禁用第3页的下一步按钮，因为我们在选择歌词时已经自动完成测试
                             else -> true
                         },
                         modifier = Modifier
@@ -425,7 +425,12 @@ fun CustomTestScreen(
                     LyricSelectionStep(
                         options = filteredLyrics,
                         selectedLyric = selectedLyric,
-                        onSelectionChanged = { selectedLyric = it },
+                        onSelectionChanged = { selectedLyric = it 
+                            // 当用户选择歌词后，直接完成测试并生成推荐
+                            if (selectedLyric != null) {
+                                completeTest()
+                            }
+                        },
                         textNote = textNote,
                         onNoteChanged = { textNote = it },
                         matchMood = matchMood,

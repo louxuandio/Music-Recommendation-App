@@ -17,6 +17,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -142,31 +143,56 @@ fun SearchScreen(
                         }
                     }
                 }
-            } else if (errorMessage != null) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = "Error loading new releases",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    Text(
-                        text = errorMessage ?: "Unknown Error",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = {
-                        coroutineScope.launch {
-                            viewModel.getTrendingSongs()
+            } else if (errorMessage?.contains("404") == true) {
+                // 404错误时特殊处理，但仍然显示歌曲
+                if (trendingSongs.isNotEmpty()) {
+                    // 展示一个轻量级的信息提示，而不是全屏错误
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Showing popular tracks while we update our catalog",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                    }) {
-                        Text("Try Again")
                     }
+                    
+                    // 展示歌曲列表
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(trendingSongs) { song ->
+                            SearchResultItem(
+                                song = song,
+                                onClick = { viewModel.playSong(song) }
+                            )
+                        }
+                    }
+                } else {
+                    // 这种情况不太可能出现，但仍提供一个处理方式
+                    ShowErrorWithRetryButton(errorMessage, viewModel)
                 }
+            } else if (errorMessage != null) {
+                // 处理其他类型的错误
+                ShowErrorWithRetryButton(errorMessage, viewModel)
             } else {
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -481,6 +507,36 @@ private fun SpotifyLoginPrompt() {
             }) {
                 Text("Login with Spotify")
             }
+        }
+    }
+}
+
+@Composable
+private fun ShowErrorWithRetryButton(errorMessage: String?, viewModel: MusicViewModel) {
+    val coroutineScope = rememberCoroutineScope()
+    
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "Error loading new releases",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.error
+        )
+        Text(
+            text = errorMessage ?: "Unknown Error",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(onClick = {
+            coroutineScope.launch {
+                viewModel.getTrendingSongs()
+            }
+        }) {
+            Text("Try Again")
         }
     }
 } 

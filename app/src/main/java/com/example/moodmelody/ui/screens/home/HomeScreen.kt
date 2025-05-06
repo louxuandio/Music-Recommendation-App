@@ -80,6 +80,40 @@ fun HomeScreen(
         }
     }
     
+    // 当加载到最新的心情测试结果且没有AI推荐时，自动生成AI推荐
+    LaunchedEffect(latestMoodEntry) {
+        if (latestMoodEntry != null) {
+            // 无论是否已有推荐，都根据最新的心情更新推荐
+            // 根据心情记录生成AI推荐
+            val entry = latestMoodEntry!!
+            val weather = currentWeather?.text ?: "sunny"
+            
+            // 获取主导情绪值作为心情分数
+            val moodScore = when(entry.result) {
+                "happy" -> entry.happy
+                "sad" -> entry.sad
+                "calm" -> entry.calm
+                "excited" -> entry.excited
+                else -> 0.5f
+            }
+            
+            // 显示正在生成的提示
+            Toast.makeText(context, "Updating recommendations based on your new mood...", Toast.LENGTH_SHORT).show()
+            
+            // 获取AI推荐
+            viewModel.getAIRecommendation(
+                moodScore = moodScore,
+                keywords = entry.keywords,
+                lyric = entry.note,
+                weather = weather,
+                matchMood = true
+            )
+            
+            // 同时刷新常规音乐推荐
+            viewModel.getRecommendations(mood = entry.result, intensity = 3)
+        }
+    }
+    
     // 处理推荐失败的情况
     LaunchedEffect(errorMessage) {
         errorMessage?.let { error ->
@@ -150,6 +184,26 @@ fun HomeScreen(
                         fontWeight = FontWeight.Bold
                     )
                     
+                    // Display user's text input if available
+                    if (entry.note.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth(0.85f),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = "\"${entry.note}\"",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
+                    
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     // 关键词标签
@@ -199,17 +253,10 @@ fun HomeScreen(
                         .padding(16.dp)
                 ) {
                     Text(
-                        text = "AI Music Recommendation",
+                        text = "Music Recommendation",
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    
-                    Text(
-                        text = recommendation.summary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(bottom = 16.dp)
                     )
                     
                     Divider(modifier = Modifier.padding(vertical = 8.dp))
@@ -370,156 +417,119 @@ fun HomeScreen(
             Text("Test Your Mood and Generate Playlist")
         }
         
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        // Recommendations
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // 根据是否有AI推荐或心情测试结果显示不同标题
-            Text(
-                text = when {
-                    aiRecommendation != null -> "AI Music Recommendations Based on Your Mood"
-                    latestMoodEntry != null -> "Recommendations Based on Today's Mood"
-                    else -> "Recommendations for You"
-                },
-                style = MaterialTheme.typography.headlineMedium
-            )
+        // Only show Recommendations section when we don't have AI recommendations
+        if (aiRecommendation == null) {
+            Spacer(modifier = Modifier.height(24.dp))
             
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    strokeWidth = 2.dp
-                )
-            }
-        }
-        
-        // 如果有最新的心情测试结果但没有AI推荐，显示生成歌单按钮
-        if (latestMoodEntry != null && aiRecommendation == null && !isLoading) {
-            // 设置matchMood为true，只提供匹配心情的音乐推荐
-            val matchMood = true
-            
-            Button(
-                onClick = {
-                    // 根据心情记录生成AI推荐
-                    val entry = latestMoodEntry!!
-                    val weather = currentWeather?.text ?: "sunny"
-                    
-                    // 获取主导情绪值作为心情分数
-                    val moodScore = when(entry.result) {
-                        "happy" -> entry.happy
-                        "sad" -> entry.sad
-                        "calm" -> entry.calm
-                        "excited" -> entry.excited
-                        else -> 0.5f
-                    }
-                    
-                    // 显示正在生成的提示
-                    Toast.makeText(context, "Generating AI recommendations, please wait...", Toast.LENGTH_SHORT).show()
-                    
-                    // 获取AI推荐
-                    viewModel.getAIRecommendation(
-                        moodScore = moodScore,
-                        keywords = entry.keywords,
-                        lyric = entry.note,
-                        weather = weather,
-                        matchMood = matchMood
-                    )
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
+            // Recommendations
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Generate AI Music Recommendations")
-            }
-        }
-        
-        // 显示错误信息（如有）
-        errorMessage?.let { error ->
-            if (error.isNotEmpty()) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
+                // 修改逻辑：不在有推荐时显示"Get Music Recommendations Based on Your Mood"标题
+                Text(
+                    text = when {
+                        recommendations.isNotEmpty() -> "Recommendations for You"
+                        latestMoodEntry != null -> "Recommendations Based on Today's Mood"
+                        else -> "Get Music Recommendations Based on Your Mood"
+                    },
+                    style = MaterialTheme.typography.headlineMedium
+                )
+                
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp
                     )
-                ) {
-                    Row(
+                }
+            }
+            
+            // 显示错误信息（如有）- 但仅当没有推荐歌曲时才显示
+            errorMessage?.let { error ->
+                if (error.isNotEmpty() && recommendations.isEmpty()) {
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(vertical = 8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
                     ) {
-                        Icon(
-                            Icons.Default.Error, 
-                            contentDescription = "Error",
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Text(
-                            text = error,
-                            color = MaterialTheme.colorScheme.error
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Error, 
+                                contentDescription = "Error",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(
+                                text = error,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
                 }
             }
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        if (recommendations.isNotEmpty()) {
-            // Display recommendations from ViewModel - 使用增强版卡片
-            Column(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                // 标题
-                Text(
-                    text = "Recommended Playlist",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-                
-                // 歌曲计数
-                Text(
-                    text = "Total: ${recommendations.size} songs",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-                
-                // 歌曲列表
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            if (recommendations.isNotEmpty()) {
+                // Display recommendations from ViewModel - 使用增强版卡片
+                Column(
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    items(recommendations) { song ->
-                        EnhancedSongCard(
-                            title = song.title,
-                            artist = song.artist ?: "未知艺术家",
-                            coverUrl = song.coverUrl,
-                            onClick = { viewModel.playSong(song) }
-                        )
+                    // 标题
+                    Text(
+                        text = "Recommended Playlist",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                    
+                    // 歌曲计数
+                    Text(
+                        text = "Total: ${recommendations.size} songs",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    
+                    // 歌曲列表
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(recommendations) { song ->
+                            EnhancedSongCard(
+                                title = song.title,
+                                artist = song.artist ?: "未知艺术家",
+                                coverUrl = song.coverUrl,
+                                onClick = { viewModel.playSong(song) }
+                            )
+                        }
                     }
                 }
-            }
-        } else if (!isLoading) {
-            // Empty state when not loading
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(180.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (hasSpotifyToken) "Select a mood or click the generate AI recommendation button to get music recommendations" else "Connect to Spotify for personalized recommendations",
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            } else if (!isLoading) {
+                // Empty state when not loading
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (hasSpotifyToken) "Select a mood or click the generate AI recommendation button to get music recommendations" else "Connect to Spotify for personalized recommendations",
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

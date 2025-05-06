@@ -7,7 +7,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -224,80 +228,55 @@ fun MoodCalendarTab(viewModel: MusicViewModel) {
         Spacer(modifier = Modifier.height(16.dp))
         
         // 显示选中日期的情绪记录
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            Column(
+        val entries = monthEntries.filter { it.result.isNotEmpty() }
+        
+        if (entries.isNotEmpty()) {
+            // Find if there's an entry for the selected date
+            val selectedEntry = entries.find { it.date == selectedDate }
+
+            
+            // Add subtitle for current selection
+            if (selectedEntry != null) {
+                Text(
+                    text = "Selected date: $selectedDate", 
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+            
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(entries) { entry ->
+                    val isSelected = entry.date == selectedDate
+                    MoodEntryCard(
+                        entry = entry, 
+                        isSelected = isSelected,
+                        onClick = {
+                            // Update selected date when clicking on a card
+                            selectedDate = entry.date
+                        }
+                    )
+                }
+            }
+        } else {
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .padding(8.dp),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Text(
-                    text = "Date: $selectedDate",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                if (loadedEntry != null) {
-                    val entry = loadedEntry!!
-                    Text(
-                        text = "Mood: ${entry.result.replaceFirstChar { it.uppercase() }}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    // 直接显示四种情绪的数值
-                    Text(
-                        text = "Joy: ${(entry.happy * 100).toInt()}%",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    
-                    Text(
-                        text = "Sadness: ${(entry.sad * 100).toInt()}%",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    
-                    Text(
-                        text = "Calm: ${(entry.calm * 100).toInt()}%",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    
-                    Text(
-                        text = "Excitement: ${(entry.excited * 100).toInt()}%",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Text(
-                        text = "Keywords: ${entry.keywords.joinToString(", ")}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    
-                    if (entry.activity != null) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Activity: ${entry.activity}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                    
-                    if (entry.note.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Note: ${entry.note}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                } else {
-                    Text("该日期没有情绪记录")
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("No mood entries for this month")
                 }
             }
         }
@@ -545,5 +524,121 @@ fun getMonthName(month: Int): String {
         Calendar.NOVEMBER -> "November"
         Calendar.DECEMBER -> "December"
         else -> ""
+    }
+}
+
+@Composable
+fun MoodEntryCard(
+    entry: MoodEntry, 
+    isSelected: Boolean = false,
+    onClick: () -> Unit = {}
+) {
+    Card(
+        modifier = Modifier
+            .width(300.dp)
+            .padding(vertical = 8.dp)
+            .let {
+                if (isSelected) {
+                    it.then(Modifier.border(
+                        width = 2.dp, 
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = RoundedCornerShape(16.dp)
+                    ))
+                } else {
+                    it
+                }
+            }
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (isSelected) 4.dp else 2.dp
+        ),
+        colors = if (isSelected) {
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        } else {
+            CardDefaults.cardColors()
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "Date: ${entry.date}",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Text(
+                text = "Mood: ${entry.result.replaceFirstChar { it.uppercase() }}",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            
+            // Display user's text input prominently after the mood if available
+            if (entry.note.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "\"${entry.note}\"",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Display emotion values
+            Text(
+                text = "Joy: ${(entry.happy * 100).toInt()}%",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            
+            Text(
+                text = "Sadness: ${(entry.sad * 100).toInt()}%",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            
+            Text(
+                text = "Calm: ${(entry.calm * 100).toInt()}%",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            
+            Text(
+                text = "Excitement: ${(entry.excited * 100).toInt()}%",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            if (entry.keywords.isNotEmpty()) {
+                Text(
+                    text = "Keywords: ${entry.keywords.joinToString(", ")}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            
+            if (entry.activity != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Activity: ${entry.activity}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
     }
 } 

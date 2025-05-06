@@ -43,6 +43,14 @@ class AIRecommendationRepository(
             val systemPrompt = """
                 You are a professional music recommendation assistant specializing in Western pop music. Based on the user's emotional data, generate targeted music recommendations.
                 
+                IMPORTANT: Be very consistent with the user's dominant mood. If they say they are "happy", describe them as having a positive, upbeat emotional state with high mood score, NOT a low score. Similarly, if their dominant mood is "sad", describe them as having a negative emotional state.
+                
+                Mood mapping guidelines:
+                - For "happy" users: Describe them as having a high mood score and positive emotional state
+                - For "sad" users: Describe them as having a low mood score and negative emotional state
+                - For "relaxed" users: Describe them as having a moderate-high mood score and calm emotional state
+                - For "excited" users: Describe them as having a high mood score and energetic emotional state
+                
                 Always recommend songs that truly reflect the user's current emotional state:
                 - For sad moods: Recommend melancholic, emotional songs that resonate with sadness (like Adele, Lewis Capaldi, Sam Smith)
                 - For relaxed moods: Recommend calm, soothing music that enhances the relaxed state (like Coldplay's slower songs, Jack Johnson)
@@ -60,14 +68,23 @@ class AIRecommendationRepository(
             val userPrompt = """
                 Based on the following data, recommend English pop music:
                 - Mood score: ${userData.moodScore}/100 (higher indicates more positive emotion)
+                - Dominant mood: ${userData.dominantMood.ifEmpty { "Not specified" }}
                 - Keywords: ${userData.keywords.joinToString(", ")}
                 - User's favorite lyrics: "${userData.lyric}"
                 - Current weather: ${userData.weather}
                 
-                Please recommend popular Western music that truly matches my current emotional state, even if I'm feeling sad or down.
-                Don't try to cheer me up - instead provide music that resonates with and validates my current feelings.
-                If my mood is negative or melancholic (mood score below 50), recommend songs that are emotionally resonant and reflective of sadness or introspection.
-                Popular artists like Adele, Sam Smith, Lewis Capaldi, Billie Eilish, Lana Del Rey, etc. would be appropriate for sad moods.
+                IMPORTANT: The dominant mood "${userData.dominantMood}" takes priority over the raw mood score. My emotional state is "${userData.dominantMood}".
+                
+                My current mood is ${userData.dominantMood.ifEmpty { "reflected by my mood score" }}, and I want music that truly matches this emotional state.
+                Please recommend popular Western music that resonates with my current emotional state.
+                
+                If my dominant mood is "happy", recommend upbeat, joyful songs.
+                If my dominant mood is "sad", recommend emotionally resonant, melancholic songs.
+                If my dominant mood is "relaxed", recommend calm, soothing music.
+                If my dominant mood is "excited", recommend high-energy, dynamic music.
+                
+                Please provide songs that actually match my mood of ${userData.dominantMood.ifEmpty { "based on my mood score" }}.
+                Do not try to artificially cheer me up if I'm feeling sad or down.
                 
                 Please consider these factors and recommend exclusively popular Western music (mainly American and British pop/rock) that authentically reflects my current mood. Return only JSON format.
             """.trimIndent()

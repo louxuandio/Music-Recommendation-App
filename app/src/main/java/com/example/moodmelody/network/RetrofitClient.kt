@@ -16,7 +16,7 @@ object RetrofitClient {
 
     // Weather API constants
     private const val WEATHER_BASE_URL = "https://api.qweather.com/"
-    private const val WEATHER_API_KEY = "9dcd04aca58344429b8e4d7ec4c0ecd3"
+    private const val WEATHER_API_KEY = "9ac45f069a45482eaac98675206236a2"
     
     // OpenAI API constants
     private const val OPENAI_BASE_URL = "https://api.openai.com/"

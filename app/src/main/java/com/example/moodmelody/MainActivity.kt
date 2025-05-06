@@ -1575,7 +1575,7 @@ class MainActivity : ComponentActivity() {
             
             // 检查是否是Spotify回调
             if (uri.toString().startsWith("moodmelody://callback")) {
-            val fragment = uri.fragment
+                val fragment = uri.fragment
                 if (fragment != null && fragment.startsWith("access_token=")) {
                     // 提取访问令牌
                     val tokenParts = fragment.split("&")
@@ -1645,9 +1645,9 @@ fun BottomNavBar(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     
-                NavigationBar {
+    NavigationBar {
         items.forEach { (screen, icon) ->
-                    NavigationBarItem(
+            NavigationBarItem(
                 icon = { Icon(painterResource(id = icon), contentDescription = null) },
                 label = { Text(getScreenName(screen)) },
                 selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,

@@ -6,30 +6,28 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface SpotifyApiService {
-    @GET("search")
+    @GET("v1/search")
     suspend fun search(
         @Query("q") query: String,
         @Query("type") type: String = "track",
-        @Query("limit") limit: Int = 20
+        @Query("limit") limit: Int = 10
     ): Response<Map<String, Any>>
 
-    @GET("recommendations")
+    @GET("v1/recommendations")
     suspend fun getRecommendations(
         @Query("seed_genres") seedGenres: String,
-        @Query("target_valence") targetValence: Float? = null,
-        @Query("target_energy") targetEnergy: Float? = null,
+        @Query("target_valence") targetValence: Float,
+        @Query("target_energy") targetEnergy: Float,
         @Query("limit") limit: Int = 20
     ): Response<Map<String, Any>>
     
-    @GET("browse/featured-playlists")
+    @GET("v1/browse/featured-playlists")
     suspend fun getFeaturedPlaylists(
-        @Query("country") country: String? = null,
-        @Query("limit") limit: Int = 20
+        @Query("limit") limit: Int = 10
     ): Response<Map<String, Any>>
     
-    @GET("browse/new-releases")
+    @GET("v1/browse/new-releases")
     suspend fun getNewReleases(
-        @Query("country") country: String? = null,
         @Query("limit") limit: Int = 20
     ): Response<Map<String, Any>>
     

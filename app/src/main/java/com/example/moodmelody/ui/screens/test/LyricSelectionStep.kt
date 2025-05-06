@@ -29,7 +29,11 @@ import com.example.moodmelody.LyricOption
 fun LyricSelectionStep(
     options: List<LyricOption>,
     selectedLyric: String?,
-    onSelectionChanged: (String?) -> Unit
+    onSelectionChanged: (String?) -> Unit,
+    textNote: String,
+    onNoteChanged: (String) -> Unit,
+    matchMood: Boolean,
+    onMatchMoodChanged: (Boolean) -> Unit
 ) {
     var showChinese by remember { mutableStateOf(true) }
     var showMore by remember { mutableStateOf(false) }
@@ -67,6 +71,29 @@ fun LyricSelectionStep(
             )
             Text(text = "中文")
         }
+        
+        // 添加心情匹配切换开关
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(bottom = 16.dp)
+        ) {
+            Text(text = "Mood-Lifting Music")
+            Switch(
+                checked = matchMood,
+                onCheckedChange = { onMatchMoodChanged(it) }
+            )
+            Text(text = "Match My Mood")
+        }
+        
+        // 添加文本备注输入框
+        TextField(
+            value = textNote,
+            onValueChange = onNoteChanged,
+            label = { Text(if (showChinese) "添加你的感受或想法..." else "Add your feelings or thoughts...") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 24.dp)
+        )
         
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(16.dp),
