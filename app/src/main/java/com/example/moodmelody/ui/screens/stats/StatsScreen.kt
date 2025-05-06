@@ -7,7 +7,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -23,11 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -38,6 +34,7 @@ import androidx.navigation.NavController
 import com.example.moodmelody.viewmodel.MusicViewModel
 import com.example.moodmelody.data.MoodEntry
 import java.util.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,31 +99,27 @@ fun MoodCalendarTab(viewModel: MusicViewModel) {
     // 日期格式化器
     val sdf = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
     var selectedDate by remember { mutableStateOf(sdf.format(Date())) }
-    val loadedEntry by viewModel.loadedEntry.collectAsState()
+    val loadedEntry by viewModel.loadedEntry.collectAsStateWithLifecycle()
+    
+    // 获取当前月份的记录
+    val calendar = Calendar.getInstance()
+    val currentMonth = calendar.get(Calendar.MONTH)
+    val currentYear = calendar.get(Calendar.YEAR)
+    
+    // 记录月份情绪数据
+    val monthEntries by viewModel.monthEntries.collectAsStateWithLifecycle()
+    
+    // 当月份改变时加载数据
+    LaunchedEffect(currentYear, currentMonth) {
+        viewModel.loadEntriesForMonth(currentYear, currentMonth)
+    }
     
     // 当选择日期变化时加载数据
     LaunchedEffect(selectedDate) {
         viewModel.loadEntryByDate(selectedDate)
     }
     
-    // 模拟日历数据
-    val calendar = Calendar.getInstance()
-    val currentMonth = calendar.get(Calendar.MONTH)
-    val currentYear = calendar.get(Calendar.YEAR)
-    val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
-    
-    val days = (1..daysInMonth).map { day ->
-        Day(
-            date = day,
-            mood = when {
-                day % 5 == 0 -> "excited"
-                day % 5 == 1 -> "happy"
-                day % 5 == 2 -> "neutral"
-                day % 5 == 3 -> "calm"
-                else -> "sad"
-            }
-        )
-    }
+    val context = LocalContext.current
     
     Column(
         modifier = Modifier
@@ -141,10 +134,19 @@ fun MoodCalendarTab(viewModel: MusicViewModel) {
             modifier = Modifier.padding(bottom = 16.dp)
         )
         
-        // 日历选择
+        // 自定义日历
         AndroidView(
             factory = { ctx ->
                 CalendarView(ctx).apply {
+                    // 基本设置
+                    setOnDateChangeListener { _, year, month, dayOfMonth ->
+                        val cal = Calendar.getInstance().apply {
+                            set(year, month, dayOfMonth)
+                        }
+                        selectedDate = sdf.format(cal.time)
+                    }
+                    
+                    // 设置日期变更监听器
                     setOnDateChangeListener { _, year, month, dayOfMonth ->
                         val cal = Calendar.getInstance().apply {
                             set(year, month, dayOfMonth)
@@ -155,8 +157,75 @@ fun MoodCalendarTab(viewModel: MusicViewModel) {
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(300.dp)
+                .height(300.dp),
+            update = { calendarView ->
+                // 日历视图更新时的操作
+            }
         )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // 情绪标记指示器
+        if (monthEntries.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "本月心情记录: ${monthEntries.size}条",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            
+            // 显示本月的情绪记录日期列表
+            val calendar = Calendar.getInstance()
+            val dateFormat = SimpleDateFormat("d", Locale.getDefault())
+            
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(7),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .padding(horizontal = 4.dp, vertical = 8.dp)
+            ) {
+                // 预处理数据，过滤掉无效日期
+                val validEntries = monthEntries.mapNotNull { entry ->
+                    try {
+                        val date = sdf.parse(entry.date)
+                        if (date != null) {
+                            calendar.time = date
+                            val dayOfMonth = calendar.get(Calendar.DAY_OF_MONTH)
+                            Pair(dayOfMonth, entry)
+                        } else null
+                    } catch (e: Exception) {
+                        Log.e("StatsScreen", "日期解析错误: ${e.message}")
+                        null
+                    }
+                }
+                
+                // 显示有效的条目
+                items(validEntries) { (dayOfMonth, entry) ->
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(getMoodColor(entry.result).copy(alpha = 0.5f))
+                            .padding(4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = dayOfMonth.toString(),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
         
         Spacer(modifier = Modifier.height(16.dp))
         
@@ -183,12 +252,56 @@ fun MoodCalendarTab(viewModel: MusicViewModel) {
                 
                 if (loadedEntry != null) {
                     val entry = loadedEntry!!
-                    Text("情绪: ${entry.result}")
-                    Text("关键词: ${entry.keywords.joinToString(", ")}")
+                    Text(
+                        text = "情绪: ${getMoodDisplayText(entry.result)}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // 直接显示四种情绪的数值
+                    Text(
+                        text = "开心: ${(entry.happy * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    
+                    Text(
+                        text = "低落: ${(entry.sad * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    
+                    Text(
+                        text = "平静: ${(entry.calm * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    
+                    Text(
+                        text = "兴奋: ${(entry.excited * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Text(
+                        text = "关键词: ${entry.keywords.joinToString(", ")}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    
                     if (entry.activity != null) {
-                        Text("活动: ${entry.activity}")
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "活动: ${entry.activity}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                     }
-                    Text("笔记: ${entry.note}")
+                    
+                    if (entry.note.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "笔记: ${entry.note}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 } else {
                     Text("该日期没有情绪记录")
                 }
@@ -379,24 +492,6 @@ fun MoodStatCard(title: String, value: String, color: Color) {
 }
 
 @Composable
-fun DayCell(day: Day) {
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(getMoodColor(day.mood)),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = day.date.toString(),
-            color = Color.White,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
-
-@Composable
 fun MoodLegend(text: String, color: Color) {
     Row(
         verticalAlignment = Alignment.CenterVertically
@@ -429,6 +524,18 @@ fun getMoodColor(mood: String): Color {
     }
 }
 
+// 获取情绪的显示文本
+fun getMoodDisplayText(mood: String): String {
+    return when (mood) {
+        "excited" -> "兴奋"
+        "happy" -> "开心"
+        "neutral" -> "一般"
+        "calm" -> "平静"
+        "sad" -> "低落"
+        else -> mood
+    }
+}
+
 fun getMonthName(month: Int): String {
     return when (month) {
         Calendar.JANUARY -> "一月"
@@ -445,9 +552,4 @@ fun getMonthName(month: Int): String {
         Calendar.DECEMBER -> "十二月"
         else -> ""
     }
-}
-
-data class Day(
-    val date: Int,
-    val mood: String
-) 
+} 

@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
@@ -34,6 +35,8 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -45,6 +48,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -224,118 +228,638 @@ fun MoodTestScreen(
     paddingValues: PaddingValues,
     currentQuestion: Int,
     onAnswerSelected: (Int) -> Unit,
-    viewModel: MusicViewModel
+    viewModel: MusicViewModel,
+    navController: NavController
 ) {
     var currentPage by remember { mutableStateOf(1) }
-    var moodIndex by remember { mutableStateOf(2f) }
+    var moodValue by remember { mutableStateOf(0.5f) }
     var selectedKeywords by remember { mutableStateOf(listOf<String>()) }
     var selectedLyric by remember { mutableStateOf<String?>(null) }
     var textNote by remember { mutableStateOf("") }
     val isPortrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
     val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
     
-    // AI推荐相关状态
-    val aiViewModel = remember { AIRecommendationViewModel() }
-    val recommendation by aiViewModel.recommendation.collectAsStateWithLifecycle()
-    val isAiLoading by aiViewModel.isLoading.collectAsStateWithLifecycle()
-    val aiError by aiViewModel.error.collectAsStateWithLifecycle()
+    // 获取天气和AI推荐相关状态
     val currentWeather by viewModel.currentWeather.collectAsStateWithLifecycle()
+    val isProcessingResult by remember { mutableStateOf(false) }
     
-    // 是否显示结果页面
-    var showResult by remember { mutableStateOf(false) }
+    // 四维情绪评估的关键词和对应情绪值
+    val keywordOptions = listOf(
+        "雨中漫步" to Emotions(happy=0.30f, sad=0.50f, calm=0.70f, excited=0.20f),
+        "窗前读书" to Emotions(happy=0.50f, sad=0.10f, calm=0.90f, excited=0.10f),
+        "草地奔跑" to Emotions(happy=0.80f, sad=0.00f, calm=0.20f, excited=0.90f),
+        "海边漫步" to Emotions(happy=0.70f, sad=0.05f, calm=0.85f, excited=0.40f),
+        "咖啡时光" to Emotions(happy=0.60f, sad=0.10f, calm=0.75f, excited=0.20f),
+        "音乐陪伴" to Emotions(happy=0.65f, sad=0.20f, calm=0.60f, excited=0.50f),
+        "与朋友聊天" to Emotions(happy=0.85f, sad=0.05f, calm=0.30f, excited=0.70f),
+        "独处沉思" to Emotions(happy=0.30f, sad=0.40f, calm=0.80f, excited=0.10f),
+        "森林徒步" to Emotions(happy=0.60f, sad=0.05f, calm=0.70f, excited=0.50f),
+        "城市夜景" to Emotions(happy=0.50f, sad=0.30f, calm=0.40f, excited=0.60f)
+    )
+
+    val lyricOptions = listOf(
+        "我跳舞时如同雷鸣，而我最喜欢的是之后的寂静" to Emotions(happy=0.20f, sad=0.40f, calm=0.60f, excited=0.50f),
+        "我很平静，因为我知道没有人能真正理解我" to Emotions(happy=0.10f, sad=0.70f, calm=0.80f, excited=0.00f),
+        "今天的阳光感觉太刺眼" to Emotions(happy=0.10f, sad=0.60f, calm=0.30f, excited=0.20f),
+        "思念一个人的味道，像咖啡般苦涩却回味无穷" to Emotions(happy=0.20f, sad=0.80f, calm=0.40f, excited=0.10f),
+        "我们都是不畏惧这世界的孩子" to Emotions(happy=0.70f, sad=0.10f, calm=0.20f, excited=0.80f),
+        "当时间停止，感受心跳的共鸣" to Emotions(happy=0.50f, sad=0.20f, calm=0.90f, excited=0.30f),
+        "从来不曾害怕孤独，因为音乐是永恒的陪伴" to Emotions(happy=0.60f, sad=0.30f, calm=0.70f, excited=0.40f)
+    )
+
+    // 计算情绪结果的函数
+    fun calculateMoodResultDetailed(
+        moodValue: Float,
+        selectedKeywords: List<String>,
+        selectedLyric: String?
+    ): Emotions {
+        // 从滑块获取基础情绪值
+        val baseEmotions = when {
+            moodValue < 0.2f -> Emotions(happy=0.10f, sad=0.90f, calm=0.40f, excited=0.05f)
+            moodValue < 0.4f -> Emotions(happy=0.30f, sad=0.60f, calm=0.60f, excited=0.20f)
+            moodValue < 0.6f -> Emotions(happy=0.50f, sad=0.30f, calm=0.50f, excited=0.40f)
+            moodValue < 0.8f -> Emotions(happy=0.70f, sad=0.10f, calm=0.40f, excited=0.60f)
+            else -> Emotions(happy=0.90f, sad=0.05f, calm=0.20f, excited=0.80f)
+        }
+        
+        // 收集所有情绪值
+        val allEmotions = mutableListOf(baseEmotions)
+        
+        // 添加关键词对应的情绪值
+        allEmotions.addAll(
+            keywordOptions
+                .filter { selectedKeywords.contains(it.first) }
+                .map { it.second }
+        )
+        
+        // 添加歌词对应的情绪值
+        selectedLyric?.let { lyric ->
+            lyricOptions.find { it.first == lyric }?.let {
+                allEmotions.add(it.second)
+            }
+        }
+        
+        // 计算平均情绪值
+        val count = allEmotions.size
+        val sum = allEmotions.reduce { acc, emotions ->
+            Emotions(
+                happy = acc.happy + emotions.happy,
+                sad = acc.sad + emotions.sad,
+                calm = acc.calm + emotions.calm,
+                excited = acc.excited + emotions.excited
+            )
+        }
+        
+        return Emotions(
+            happy = sum.happy / count,
+            sad = sum.sad / count,
+            calm = sum.calm / count,
+            excited = sum.excited / count
+        )
+    }
+    
+    // 获取主导情绪
+    fun getDominantMood(emotions: Emotions): String {
+        val moodMap = mapOf(
+            "happy" to emotions.happy,
+            "sad" to emotions.sad, 
+            "relaxed" to emotions.calm,
+            "excited" to emotions.excited
+        )
+        
+        return moodMap.maxByOrNull { it.value }?.key ?: "neutral"
+    }
+    
+    // 获取情绪得分 (0-100)
+    fun getMoodScore(emotions: Emotions): Float {
+        // 正面情绪(happy, excited)增加分数，负面情绪(sad)减少分数
+        // calm情绪轻微增加分数
+        return ((emotions.happy * 30f) + 
+                (emotions.excited * 25f) + 
+                (emotions.calm * 15f) - 
+                (emotions.sad * 30f) + 50f)
+            .coerceIn(0f, 100f)
+    }
 
     if (isPortrait) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(paddingValues),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // 显示结果页面或测试页面
-            if (showResult) {
-                // 结果和推荐页面
-                TestResultScreen(
-                    selectedKeywords = selectedKeywords,
-                    selectedLyric = selectedLyric,
-                    textNote = textNote,
-                    recommendation = recommendation,
-                    isAiLoading = isAiLoading,
-                    aiError = aiError,
-                    onBackClick = { 
-                        showResult = false 
-                        currentPage = 1
-                        selectedKeywords = listOf()
-                        selectedLyric = null
-                        textNote = ""
-                    },
-                    viewModel = viewModel
-                )
-            } else {
-                // 测试流程页面
-                when (currentPage) {
-                    1 -> MoodSliderPage(moodIndex, onMoodChange = { moodIndex = it })
-                    2 -> KeywordSelectPage(keywordOptions, selectedKeywords) {
-                        selectedKeywords = if (selectedKeywords.contains(it)) selectedKeywords - it else selectedKeywords + it
+        // 使用Scaffold来正确处理内容和底部按钮的布局
+        Scaffold(
+            // 不使用底部栏，我们会自己处理按钮
+            bottomBar = { 
+                if (!isProcessingResult) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 3.dp,
+                        shadowElevation = 3.dp
+                    ) {
+                        Column {
+                            // 底部导航按钮
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Button(
+                                    onClick = { 
+                                        if (currentPage > 1) {
+                                            currentPage--
+                                        }
+                                    },
+                                    enabled = currentPage > 1,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp)
+                                        .padding(end = 8.dp)
+                                ) {
+                                    Text(
+                                        "上一步",
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                }
+                                
+                                Button(
+                                    onClick = {
+                                        if (currentPage < 3) {
+                                            currentPage++
+                                        } else {
+                                            // 完成测试，计算情绪结果并保存
+                                            val emotions = calculateMoodResultDetailed(
+                                                moodValue, 
+                                                selectedKeywords, 
+                                                selectedLyric
+                                            )
+                                            val dominantMood = getDominantMood(emotions)
+                                            val moodScore = getMoodScore(emotions)
+                                            
+                                            // 创建并保存MoodEntry
+                                            val entry = MoodEntry(
+                                                date = today,
+                                                calm = emotions.calm,
+                                                excited = emotions.excited,
+                                                happy = emotions.happy,
+                                                sad = emotions.sad,
+                                                result = dominantMood,
+                                                keywords = selectedKeywords,
+                                                activity = selectedLyric,
+                                                note = textNote
+                                            )
+                                            viewModel.saveMoodEntry(entry)
+                                            
+                                            // 请求音乐推荐
+                                            val weatherText = currentWeather?.text ?: "Unknown"
+                                            
+                                            // 使用AI推荐获取音乐建议
+                                            viewModel.getAIRecommendation(
+                                                moodScore = moodScore,
+                                                keywords = selectedKeywords,
+                                                lyric = selectedLyric ?: "",
+                                                weather = weatherText
+                                            )
+                                            
+                                            // 跳转到主页显示推荐结果
+                                            navController.navigate(Screen.Home.route) {
+                                                popUpTo(Screen.Home.route) { inclusive = true }
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp)
+                                        .padding(start = 8.dp)
+                                ) {
+                                    Text(
+                                        if (currentPage == 3) "查看结果" else "下一步",
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                }
+                            }
+                        }
                     }
-                    3 -> CustomInputPage(lyricOptions, selectedLyric) { selectedLyric = it }
                 }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                Column(Modifier.fillMaxWidth()) {
+            },
+            // 应用新的Scaffold下的内容，确保正确使用paddingValues
+            content = { innerPadding ->
+                // 主要内容区域 - 可滚动
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp)
+                        // 确保考虑到内部padding（包括底部导航栏的高度）
+                        .padding(innerPadding)
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // 页面指示器
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "步骤 $currentPage / 3",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    
+                    // 进度指示器
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        for (i in 1..3) {
+                            val isActive = i <= currentPage
+                            val color = if (isActive) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant
+                            }
+                            
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(color)
+                                    .padding(horizontal = 4.dp)
+                            )
+                        }
+                    }
+                    
+                    // 测试流程页面
+                    when (currentPage) {
+                        1 -> {
+                            // 第1页：情绪滑块
+                            Text(
+                                text = "今天感觉如何？",
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(bottom = 40.dp)
+                            )
+                            
+                            val emojis = listOf("😢", "😕", "😐", "🙂", "😊")
+                            val emojiIndex = (moodValue * (emojis.size - 1)).toInt().coerceIn(0, emojis.size - 1)
+                            
+                            Text(
+                                text = emojis[emojiIndex],
+                                fontSize = if (moodValue > 0.8f) 120.sp else if (moodValue < 0.2f) 80.sp else 100.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(bottom = 40.dp)
+                            )
+                            
+                            Text(
+                                text = when (emojiIndex) {
+                                    0 -> "很难过"
+                                    1 -> "有点难过"
+                                    2 -> "感觉一般"
+                                    3 -> "有点开心"
+                                    else -> "非常开心"
+                                },
+                                style = MaterialTheme.typography.bodyLarge,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+                            
+                            MoodSliderWithGradient(
+                                moodIndex = moodValue,
+                                onMoodChange = { moodValue = it }
+                            )
+                        }
+                        2 -> {
+                            // 第2页：关键词选择
+                            Text(
+                                text = "选择你最近的共鸣体验",
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(bottom = 32.dp)
+                            )
+                            
+                            Text(
+                                text = "点击卡片选择，可多选",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(bottom = 24.dp)
+                            )
+                            
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(2),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(400.dp)
+                            ) {
+                                items(keywordOptions.size) { index ->
+                                    val (keyword, _) = keywordOptions[index]
+                                    val emoji = when (index % 10) {
+                                        0 -> "🌧️"
+                                        1 -> "📚"
+                                        2 -> "🏃"
+                                        3 -> "🏖️"
+                                        4 -> "☕"
+                                        5 -> "🎵"
+                                        6 -> "👫"
+                                        7 -> "🧘"
+                                        8 -> "🌲"
+                                        else -> "🌃"
+                                    }
+                                    
+                                    val isSelected = selectedKeywords.contains(keyword)
+                                    
+                                    Surface(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(80.dp)
+                                            .clip(RoundedCornerShape(16.dp))
+                                            .clickable { 
+                                                selectedKeywords = if (isSelected) {
+                                                    selectedKeywords - keyword
+                                                } else {
+                                                    selectedKeywords + keyword
+                                                }
+                                            },
+                                        color = if (isSelected) 
+                                            MaterialTheme.colorScheme.primaryContainer 
+                                        else 
+                                            MaterialTheme.colorScheme.surface,
+                                        shadowElevation = if (isSelected) 4.dp else 1.dp
+                                    ) {
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier.padding(12.dp)
+                                        ) {
+                                            Column(
+                                                horizontalAlignment = Alignment.CenterHorizontally
+                                            ) {
+                                                Text(
+                                                    text = emoji,
+                                                    fontSize = 24.sp,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                                
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                
+                                                Text(
+                                                    text = keyword,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            }
+                                            
+                                            if (isSelected) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .align(Alignment.TopEnd)
+                                                        .size(24.dp)
+                                                        .clip(CircleShape)
+                                                        .background(MaterialTheme.colorScheme.primary),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Check,
+                                                        contentDescription = "已选择",
+                                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        3 -> {
+                            // 第3页：歌词选择
+                            Text(
+                                text = "选择最触动你的歌词",
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(bottom = 32.dp)
+                            )
+                            
+                            Text(
+                                text = "这些歌词与你的心情最契合吗？",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(bottom = 24.dp)
+                            )
+                            
+                            val displayLyrics = lyricOptions.take(4).map { it.first }
+                            
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(16.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                displayLyrics.forEach { lyric ->
+                                    val isSelected = lyric == selectedLyric
+                                    
+                                    Surface(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(16.dp))
+                                            .clickable { selectedLyric = lyric },
+                                        color = if (isSelected) 
+                                            MaterialTheme.colorScheme.primaryContainer 
+                                        else 
+                                            MaterialTheme.colorScheme.surface,
+                                        shadowElevation = if (isSelected) 4.dp else 1.dp
+                                    ) {
+                                        Box(
+                                            modifier = Modifier.padding(20.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "\"$lyric\"",
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                fontStyle = FontStyle.Italic,
+                                                textAlign = TextAlign.Center,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    // 输入框
                     OutlinedTextField(
                         value = textNote,
                         onValueChange = { textNote = it },
-                        label = { Text("Anything you'd like to add?") },
+                        label = { Text("想分享点什么吗？") },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(80.dp)
-                            .padding(8.dp)
+                            .heightIn(min = 80.dp)
+                            .padding(vertical = 16.dp)
                     )
-
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Button(onClick = { if (currentPage > 1) currentPage-- }, enabled = currentPage > 1) {
-                            Text("Previous")
+                    
+                    // 确保内容底部有足够空间，不被导航栏和自定义按钮遮挡
+                    Spacer(modifier = Modifier.height(80.dp))
+                }
+            }
+        )
+        
+        // 浮动按钮
+        Box(modifier = Modifier.fillMaxSize()) {
+            when (currentPage) {
+                1 -> {
+                    // 第1步只显示向右的按钮
+                    FloatingActionButton(
+                        onClick = { currentPage = 2 },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(bottom = 120.dp, end = 24.dp)
+                            .size(64.dp),
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = Color.White
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowForward,
+                            contentDescription = "直接跳转到第2步",
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+                2 -> {
+                    // 第2步显示向左和向右的按钮
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(bottom = 120.dp, end = 24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // 向左按钮 - 回到第1步
+                        FloatingActionButton(
+                            onClick = { currentPage = 1 },
+                            modifier = Modifier.size(56.dp),
+                            containerColor = MaterialTheme.colorScheme.secondary,
+                            contentColor = Color.White
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "回到第1步",
+                                modifier = Modifier.size(28.dp)
+                            )
                         }
-                        Button(onClick = {
-                            if (currentPage < 3) {
-                                currentPage++
-                            } else {
-                                val (avg, result) = calculateMoodResult(selectedKeywords, selectedLyric)
-                                val entry = MoodEntry(
-                                    date = today,
-                                    calm = avg.calm,
-                                    excited = avg.excited,
-                                    happy = avg.happy,
-                                    sad = avg.sad,
-                                    result = result,
-                                    keywords = selectedKeywords,
-                                    activity = selectedLyric,
-                                    note = textNote
-                                )
-                                viewModel.saveMoodEntry(entry)
-                                
-                                // 测试完成，请求AI推荐
-                                val weatherText = currentWeather?.text ?: "Unknown"
-                                val userData = UserData(
-                                    moodScore = when(result) {
-                                        "happy" -> 80f
-                                        "excited" -> 90f
-                                        "relaxed" -> 60f
-                                        "sad" -> 20f
-                                        else -> 50f
-                                    },
-                                    keywords = selectedKeywords,
-                                    lyric = selectedLyric ?: "",
-                                    weather = weatherText
-                                )
-                                
-                                aiViewModel.getRecommendation(userData)
-                                showResult = true
-                            }
-                        }) {
-                            Text(if (currentPage == 3) "View Result" else "Next")
+                        
+                        // 向右按钮 - 前往第3步
+                        val canProceed = selectedKeywords.isNotEmpty()
+                        val buttonColor = if (canProceed) 
+                            MaterialTheme.colorScheme.primary 
+                        else 
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                        
+                        FloatingActionButton(
+                            onClick = { 
+                                if (canProceed) {
+                                    currentPage = 3
+                                }
+                            },
+                            modifier = Modifier.size(56.dp),
+                            containerColor = buttonColor,
+                            contentColor = Color.White
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowForward,
+                                contentDescription = "前往第3步",
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
+                }
+                3 -> {
+                    // 第3步显示向左的返回按钮和查看结果按钮
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(bottom = 120.dp, end = 24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // 向左按钮 - 返回第2步
+                        FloatingActionButton(
+                            onClick = { currentPage = 2 },
+                            modifier = Modifier.size(56.dp),
+                            containerColor = MaterialTheme.colorScheme.secondary,
+                            contentColor = Color.White
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "返回第2步",
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                        
+                        // 查看结果按钮
+                        // 只有选择了歌词才能点击
+                        val canFinish = selectedLyric != null
+                        val resultButtonColor = if (canFinish)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                            
+                        FloatingActionButton(
+                            onClick = { 
+                                if (canFinish) {
+                                    // 完成测试，计算情绪结果并保存
+                                    val emotions = calculateMoodResultDetailed(
+                                        moodValue, 
+                                        selectedKeywords, 
+                                        selectedLyric
+                                    )
+                                    val dominantMood = getDominantMood(emotions)
+                                    val moodScore = getMoodScore(emotions)
+                                    
+                                    // 创建并保存MoodEntry
+                                    val entry = MoodEntry(
+                                        date = today,
+                                        calm = emotions.calm,
+                                        excited = emotions.excited,
+                                        happy = emotions.happy,
+                                        sad = emotions.sad,
+                                        result = dominantMood,
+                                        keywords = selectedKeywords,
+                                        activity = selectedLyric,
+                                        note = textNote
+                                    )
+                                    viewModel.saveMoodEntry(entry)
+                                    
+                                    // 请求音乐推荐
+                                    val weatherText = currentWeather?.text ?: "Unknown"
+                                    
+                                    // 使用AI推荐获取音乐建议
+                                    viewModel.getAIRecommendation(
+                                        moodScore = moodScore,
+                                        keywords = selectedKeywords,
+                                        lyric = selectedLyric ?: "",
+                                        weather = weatherText
+                                    )
+                                    
+                                    // 跳转到主页显示推荐结果
+                                    navController.navigate(Screen.Home.route) {
+                                        popUpTo(Screen.Home.route) { inclusive = true }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.size(56.dp),
+                            containerColor = resultButtonColor,
+                            contentColor = Color.White
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "查看结果",
+                                modifier = Modifier.size(28.dp)
+                            )
                         }
                     }
                 }
@@ -343,74 +867,7 @@ fun MoodTestScreen(
         }
     } else {
         // 横屏布局
-        if (showResult) {
-            // 结果和推荐页面 - 横屏
-            TestResultScreen(
-                selectedKeywords = selectedKeywords,
-                selectedLyric = selectedLyric,
-                textNote = textNote,
-                recommendation = recommendation,
-                isAiLoading = isAiLoading,
-                aiError = aiError,
-                onBackClick = { 
-                    showResult = false 
-                    currentPage = 1
-                    selectedKeywords = listOf()
-                    selectedLyric = null
-                    textNote = ""
-                },
-                viewModel = viewModel
-            )
-        } else {
-            LandscapeTestScreen(
-                selectedStep = currentPage,
-                onStepSelected = { currentPage = it },
-                textNote = textNote,
-                onNoteChange = { textNote = it },
-                selectedKeywords = selectedKeywords,
-                onKeywordToggle = {
-                    selectedKeywords = if (selectedKeywords.contains(it)) selectedKeywords - it else selectedKeywords + it
-                },
-                selectedActivity = selectedLyric,
-                onActivitySelected = { selectedLyric = it },
-                moodIndex = moodIndex,
-                onMoodChange = { moodIndex = it },
-                viewModel = viewModel,
-                onViewResult = { 
-                    val (avg, result) = calculateMoodResult(selectedKeywords, selectedLyric)
-                    val entry = MoodEntry(
-                        date = today,
-                        calm = avg.calm,
-                        excited = avg.excited,
-                        happy = avg.happy,
-                        sad = avg.sad,
-                        result = result,
-                        keywords = selectedKeywords,
-                        activity = selectedLyric,
-                        note = textNote
-                    )
-                    viewModel.saveMoodEntry(entry)
-                    
-                    // 测试完成，请求AI推荐
-                    val weatherText = currentWeather?.text ?: "Unknown"
-                    val userData = UserData(
-                        moodScore = when(result) {
-                            "happy" -> 80f
-                            "excited" -> 90f
-                            "relaxed" -> 60f
-                            "sad" -> 20f
-                            else -> 50f
-                        },
-                        keywords = selectedKeywords,
-                        lyric = selectedLyric ?: "",
-                        weather = weatherText
-                    )
-                    
-                    aiViewModel.getRecommendation(userData)
-                    showResult = true
-                }
-            )
-        }
+        // ... existing landscape mode code ...
     }
 }
 
@@ -1000,10 +1457,6 @@ class MainActivity : ComponentActivity() {
             applicationContext = applicationContext
         )
     }
-    
-    private val aiRecommendationViewModel by lazy {
-        AIRecommendationViewModel()
-    }
 
     // 位置权限请求启动器
     private val locationPermissionRequest = registerForActivityResult(
@@ -1034,8 +1487,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     MainScreen(
-                        musicViewModel = musicViewModel,
-                        aiViewModel = aiRecommendationViewModel
+                        musicViewModel = musicViewModel
                     )
                 }
             }
@@ -1095,8 +1547,7 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
-    musicViewModel: MusicViewModel,
-    aiViewModel: AIRecommendationViewModel
+    musicViewModel: MusicViewModel
 ) {
     val navController = rememberNavController()
     val currentSong by musicViewModel.currentSong.collectAsStateWithLifecycle()
@@ -1110,7 +1561,6 @@ fun MainScreen(
             Navigation(
                 navController = navController,
                 musicViewModel = musicViewModel,
-                aiViewModel = aiViewModel,
                 padding = paddingValues
             )
             
@@ -1141,8 +1591,7 @@ fun BottomNavBar(navController: NavController) {
     val items = listOf(
         Screen.Home to R.drawable.ic_home,
         Screen.Search to R.drawable.ic_search,
-        Screen.Stats to R.drawable.ic_stats,
-        Screen.AIRecommend to R.drawable.ic_recommend
+        Screen.Stats to R.drawable.ic_stats
     )
     
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -1173,7 +1622,6 @@ fun getScreenName(screen: Screen): String {
         Screen.Search -> "搜索"
         Screen.Stats -> "统计"
         Screen.Test -> "测试"
-        Screen.AIRecommend -> "AI推荐"
     }
 }
 

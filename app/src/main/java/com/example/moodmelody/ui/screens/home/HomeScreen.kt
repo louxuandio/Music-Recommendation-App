@@ -14,8 +14,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.moodmelody.Song
 import com.example.moodmelody.navigation.Screen
@@ -29,6 +31,12 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MusicNote
+import com.example.moodmelody.model.Recommendation
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.Dispatchers
 
 @Composable
 fun HomeScreen(
@@ -40,15 +48,26 @@ fun HomeScreen(
     val coroutineScope = rememberCoroutineScope()
     
     // Collect ViewModel data
-    val currentWeather by viewModel.currentWeather.collectAsState()
-    val recommendations by viewModel.recommendations.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
+    val currentWeather by viewModel.currentWeather.collectAsStateWithLifecycle()
+    val recommendations by viewModel.recommendations.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    
+    // AI推荐结果
+    val aiRecommendation by viewModel.aiRecommendation.collectAsStateWithLifecycle()
+    
+    // 添加最新的心情测试结果
+    val latestMoodEntry by viewModel.loadedEntry.collectAsStateWithLifecycle()
     
     // Check Spotify token status
     val hasSpotifyToken = remember { RetrofitClient.hasToken() }
     
-    // Auto-load recommendations when page loads
+    // Auto-load latest mood entry and recommendations when page loads
     LaunchedEffect(Unit) {
+        // 加载今天的心情记录
+        val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+        val today = dateFormat.format(java.util.Date())
+        viewModel.loadEntryByDate(today)
+        
         // If no recommendations yet, get based on default mood
         if (recommendations.isEmpty() && hasSpotifyToken) {
             viewModel.getRecommendations(mood = "happy", intensity = 3)
@@ -62,6 +81,170 @@ fun HomeScreen(
             .verticalScroll(scrollState)
             .padding(16.dp)
     ) {
+        // 显示最新的心情测试结果
+        latestMoodEntry?.let { entry ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "今日心情",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // 心情大型emoji显示
+                    Text(
+                        text = when(entry.result) {
+                            "happy" -> "😊"
+                            "excited" -> "😃"
+                            "calm" -> "😌"
+                            "sad" -> "😢"
+                            "neutral" -> "😐"
+                            else -> "🤔"
+                        },
+                        fontSize = 80.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                    
+                    // 显示心情类型
+                    Text(
+                        text = when(entry.result) {
+                            "happy" -> "开心"
+                            "excited" -> "兴奋"
+                            "calm" -> "平静"
+                            "sad" -> "低落"
+                            "neutral" -> "一般"
+                            else -> entry.result
+                        },
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // 关键词标签
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        entry.keywords.take(3).forEach { keyword ->
+                            SuggestionChip(
+                                onClick = { },
+                                label = { Text(keyword) },
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                        }
+                    }
+                    
+                    // 查看详情按钮
+                    Button(
+                        onClick = {
+                            // 导航到统计页面
+                            navController.navigate(Screen.Stats.route)
+                        },
+                        modifier = Modifier.padding(top = 8.dp)
+                    ) {
+                        Text("查看详细情绪记录")
+                    }
+                }
+            }
+        }
+        
+        // AI推荐结果显示区域 - 只在有AI推荐时显示
+        aiRecommendation?.let { recommendation ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "AI Music Recommendation",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    Text(
+                        text = recommendation.summary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    
+                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    
+                    Text(
+                        text = "Suggested Songs:",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    // 显示推荐歌曲
+                    recommendation.suggestedSongs.forEach { songTitle ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MusicNote,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            
+                            Spacer(modifier = Modifier.width(8.dp))
+                            
+                            Text(
+                                text = songTitle,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                    
+                    if (recommendations.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "These songs are ready to play",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            }
+        }
+        
         // Weather card
         currentWeather?.let { weather ->
             WeatherCard(
@@ -170,7 +353,7 @@ fun HomeScreen(
             onClick = { navController.navigate(Screen.Test.route) },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Take Detailed Mood Test")
+            Text("测试心情并生成歌单")
         }
         
         Spacer(modifier = Modifier.height(24.dp))
@@ -181,8 +364,13 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // 根据是否有AI推荐或心情测试结果显示不同标题
             Text(
-                text = "Recommended for You",
+                text = when {
+                    aiRecommendation != null -> "AI根据心情推荐的歌曲"
+                    latestMoodEntry != null -> "根据今日心情推荐"
+                    else -> "为您推荐"
+                },
                 style = MaterialTheme.typography.headlineMedium
             )
             
@@ -191,6 +379,39 @@ fun HomeScreen(
                     modifier = Modifier.size(24.dp),
                     strokeWidth = 2.dp
                 )
+            }
+        }
+        
+        // 如果有最新的心情测试结果但没有AI推荐，显示生成歌单按钮
+        if (latestMoodEntry != null && aiRecommendation == null && !isLoading) {
+            Button(
+                onClick = {
+                    // 根据心情记录生成AI推荐
+                    val entry = latestMoodEntry!!
+                    val weather = currentWeather?.text ?: "晴天"
+                    
+                    // 获取主导情绪值作为心情分数
+                    val moodScore = when(entry.result) {
+                        "happy" -> entry.happy
+                        "sad" -> entry.sad
+                        "calm" -> entry.calm
+                        "excited" -> entry.excited
+                        else -> 0.5f
+                    }
+                    
+                    // 获取AI推荐
+                    viewModel.getAIRecommendation(
+                        moodScore = moodScore,
+                        keywords = entry.keywords,
+                        lyric = entry.note,
+                        weather = weather
+                    )
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            ) {
+                Text("根据心情生成AI歌单")
             }
         }
         

@@ -15,6 +15,9 @@ import com.example.moodmelody.data.MoodDatabase
 import com.example.moodmelody.data.MoodEntry
 import android.app.Application
 import android.util.Log
+import com.example.moodmelody.repository.AIRecommendationRepository
+import com.example.moodmelody.model.UserData
+import com.example.moodmelody.model.Recommendation
 
 class MusicViewModel(
     private val spotifyRepository: SpotifyRepository,
@@ -26,6 +29,9 @@ class MusicViewModel(
     private val dao = MoodDatabase.getDatabase(applicationContext).moodEntryDao()
     private val _loadedEntry = MutableStateFlow<MoodEntry?>(null)
     val loadedEntry: StateFlow<MoodEntry?> = _loadedEntry
+
+    private val _monthEntries = MutableStateFlow<List<MoodEntry>>(emptyList())
+    val monthEntries: StateFlow<List<MoodEntry>> = _monthEntries
 
     private val _searchResults = MutableStateFlow<List<Song>>(emptyList())
     val searchResults: StateFlow<List<Song>> = _searchResults
@@ -48,12 +54,28 @@ class MusicViewModel(
     val currentSong = playerManager.currentSong
     val isPlaying = playerManager.isPlaying
 
+    // AI推荐状态
+    private val _aiRecommendation = MutableStateFlow<Recommendation?>(null)
+    val aiRecommendation: StateFlow<Recommendation?> = _aiRecommendation
+
     init {
         // 连接到Spotify播放器
         playerManager.connect()
 
         // 初始化时加载天气数据
         loadWeather()
+        
+        // 加载今日心情记录
+        loadTodayMoodEntry()
+    }
+
+    /**
+     * 加载今日的心情记录
+     */
+    private fun loadTodayMoodEntry() {
+        val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+        val today = dateFormat.format(java.util.Date())
+        loadEntryByDate(today)
     }
 
     /**
@@ -169,15 +191,32 @@ class MusicViewModel(
         playerManager.disconnect()
     }
 
-
+    // 保存心情记录
     fun saveMoodEntry(entry: MoodEntry) {
         viewModelScope.launch {
-            dao.insert(entry)
+            try {
+                // 使用dao直接访问数据库
+                dao.insert(entry)
+                Log.d("MusicViewModel", "成功保存心情记录: ${entry.date}")
+            } catch (e: Exception) {
+                Log.e("MusicViewModel", "保存心情记录失败: ${e.message}", e)
+            }
         }
     }
+
     fun loadEntryByDate(date: String) {
         viewModelScope.launch {
             _loadedEntry.value = dao.getEntryByDate(date)
+        }
+    }
+
+    fun loadEntriesForMonth(year: Int, month: Int) {
+        viewModelScope.launch {
+            // 格式化月份，确保单位数月份前面加0
+            val monthStr = String.format("%04d-%02d", year, month + 1)
+            val monthPattern = "$monthStr%"
+            _monthEntries.value = dao.getEntriesForMonth(monthPattern)
+            Log.d("MusicViewModel", "Loaded ${_monthEntries.value.size} entries for month: $monthStr")
         }
     }
 
@@ -224,6 +263,50 @@ class MusicViewModel(
             // 如果找到了歌曲，尝试播放第一首
             if (resultSongs.isNotEmpty()) {
                 playSong(resultSongs[0])
+            }
+        }
+    }
+
+    // 获取AI音乐推荐
+    fun getAIRecommendation(
+        moodScore: Float,
+        keywords: List<String>,
+        lyric: String,
+        weather: String
+    ) {
+        viewModelScope.launch {
+            try {
+                // 设置加载状态
+                _isLoading.value = true
+                
+                // 创建AI推荐仓库
+                val aiRepository = AIRecommendationRepository()
+                
+                // 创建用户数据
+                val userData = UserData(
+                    moodScore = moodScore,
+                    keywords = keywords,
+                    lyric = lyric,
+                    weather = weather
+                )
+                
+                // 获取推荐
+                val recommendation = aiRepository.recommendWithOpenAI(userData)
+                
+                // 存储推荐结果
+                _aiRecommendation.value = recommendation
+                
+                // 基于推荐创建播放列表
+                createPlaylistFromAIRecommendation(recommendation.suggestedSongs)
+                
+                // 清除错误状态
+                _errorMessage.value = null
+            } catch (e: Exception) {
+                Log.e("MusicViewModel", "获取AI推荐失败: ${e.message}", e)
+                _errorMessage.value = "获取推荐失败: ${e.message}"
+            } finally {
+                // 清除加载状态
+                _isLoading.value = false
             }
         }
     }

@@ -57,7 +57,7 @@ fun KeywordSelectionStep(
         )
         
         Text(
-            text = "点击卡片选择可以组合多项",
+            text = "点击卡片选择，可多选",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
             textAlign = TextAlign.Center,
@@ -77,40 +77,6 @@ fun KeywordSelectionStep(
                     isSelected = selectedKeywords.contains(keyword),
                     onClick = { onKeywordSelected(keyword) }
                 )
-            }
-            
-            // 添加自定义选项卡片
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(80.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(24.dp)
-                        )
-                        .clickable { /* TODO: 实现自定义输入 */ },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "添加自定义",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "自定义",
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    }
-                }
             }
         }
     }
