@@ -16,14 +16,14 @@ class MoodMelodyApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // 初始化播放器管理器
+        // Initialize Player Manager
         playerManager = SpotifyPlayerManager(this)
 
-        // 初始化Repository
+        // Initialize Repository
         spotifyRepository = SpotifyRepository(RetrofitClient.spotifyApiService)
         weatherRepository = WeatherRepository(RetrofitClient.weatherApiService)
 
-        // 初始化ViewModel
+        // Initialize ViewModel
         musicViewModel = MusicViewModel(
             spotifyRepository = spotifyRepository,
             weatherRepository = weatherRepository,
@@ -31,7 +31,7 @@ class MoodMelodyApp : Application() {
             applicationContext = this
         )
         
-        // 尝试连接Spotify播放器
+        // Try to connect with Spotify Player
         playerManager.connect()
     }
 }

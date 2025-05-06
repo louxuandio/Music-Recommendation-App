@@ -59,7 +59,7 @@ fun LyricSelectionStep(
             modifier = Modifier.padding(bottom = 16.dp)
         )
         
-        // 添加语言切换开关
+        // Language switch button
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(bottom = 24.dp)
@@ -71,8 +71,7 @@ fun LyricSelectionStep(
             )
             Text(text = "中文")
         }
-        
-        // 添加心情匹配切换开关
+
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(bottom = 16.dp)
@@ -85,7 +84,7 @@ fun LyricSelectionStep(
             Text(text = "Match My Mood")
         }
         
-        // 添加文本备注输入框
+        // Text field for note
         TextField(
             value = textNote,
             onValueChange = onNoteChanged,

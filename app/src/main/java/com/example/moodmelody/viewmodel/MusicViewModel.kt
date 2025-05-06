@@ -49,33 +49,31 @@ class MusicViewModel(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage
 
-    // 新增：天气状态流
     private val _currentWeather = MutableStateFlow<WeatherNow?>(null)
     val currentWeather: StateFlow<WeatherNow?> = _currentWeather
 
-    // AI推荐状态
     private val _aiRecommendation = MutableStateFlow<Recommendation?>(null)
     val aiRecommendation: StateFlow<Recommendation?> = _aiRecommendation
 
     init {
-        // 连接到Spotify播放器
+        // connect to Spotify Player
         playerManager.connect()
 
-        // 初始化时加载天气数据
+        // Load weather while initialize
         loadWeather()
         
-        // 加载今日心情记录
+        // Load the record of the mood
         loadTodayMoodEntry()
 
         viewModelScope.launch {
-            // 初始化加载
+            // Initialize
             getRecommendations(mood = "happy", intensity = 3)
             getTrendingSongs()
         }
     }
 
     /**
-     * 加载今日的心情记录
+     * Initialize the mood for the day
      */
     private fun loadTodayMoodEntry() {
         val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
@@ -90,19 +88,18 @@ class MusicViewModel(
         viewModelScope.launch {
             _isLoading.value = true
             
-            // 添加详细日志
-            Log.d("MusicViewModel", "开始加载天气数据...")
-            
-            // 使用WeatherRepository获取随机化的模拟天气数据，而不是硬编码的晴天
+            // Load detailed Note
+            Log.d("MusicViewModel", "Start loading Weather data...")
+
             weatherRepository.getCurrentWeather(applicationContext).fold(
                 onSuccess = { weatherData ->
-                    Log.d("MusicViewModel", "天气数据加载成功: $weatherData")
+                    Log.d("MusicViewModel", "Weather information loaded: $weatherData")
                     _currentWeather.value = weatherData
                     _errorMessage.value = null
                 },
                 onFailure = { error ->
-                    Log.e("MusicViewModel", "天气加载失败", error)
-                    // 提供一个默认值以防失败
+                    Log.e("MusicViewModel", "Weather load failure", error)
+                    // In Case it fails
                     val fallbackWeather = WeatherNow(
                         obsTime = "2023-04-30T14:30:00+08:00",
                         temp = "22",
@@ -126,66 +123,6 @@ class MusicViewModel(
             )
             
             _isLoading.value = false
-            
-            /* 注释掉原始API调用代码，因为API返回403错误
-            // 先测试API连接
-            try {
-                val testResult = com.example.moodmelody.utils.WeatherAPITester.testDirectAPICall(applicationContext)
-                testResult.fold(
-                    onSuccess = { message ->
-                        Log.d("MusicViewModel", "天气API直接测试成功: $message")
-                    },
-                    onFailure = { error ->
-                        Log.e("MusicViewModel", "天气API直接测试失败", error)
-                    }
-                )
-            } catch (e: Exception) {
-                Log.e("MusicViewModel", "天气API测试过程中发生异常", e)
-            }
-            
-            // 然后使用Repository加载天气
-            weatherRepository.getCurrentWeather(applicationContext).fold(
-                onSuccess = { weatherData ->
-                    Log.d("MusicViewModel", "天气数据加载成功: $weatherData")
-                    _currentWeather.value = weatherData
-                    _errorMessage.value = null
-                },
-                onFailure = { error ->
-                    Log.e("MusicViewModel", "天气加载失败", error)
-                    _errorMessage.value = "Failed to get weather: ${error.message}"
-                    
-                    // 如果加载失败，尝试直接通过Retrofit测试
-                    viewModelScope.launch {
-                        try {
-                            val retrofitTestResult = com.example.moodmelody.utils.WeatherAPITester.testRetrofitAPICall(applicationContext)
-                            retrofitTestResult.fold(
-                                onSuccess = { weatherData ->
-                                    Log.d("MusicViewModel", "Retrofit测试成功: $weatherData")
-                                    _currentWeather.value = weatherData.copy(cityName = "Test City")
-                                    _errorMessage.value = null
-                                },
-                                onFailure = { testError ->
-                                    Log.e("MusicViewModel", "Retrofit测试失败", testError)
-                                }
-                            )
-                        } catch (e: Exception) {
-                            Log.e("MusicViewModel", "Retrofit测试异常", e)
-                        }
-                    }
-                    
-                    // 如果30秒后仍然没有天气数据，尝试再次加载
-                    viewModelScope.launch {
-                        delay(10000)  // 10秒
-                        if (_currentWeather.value == null) {
-                            Log.d("MusicViewModel", "尝试重新加载天气数据...")
-                            loadWeather()
-                        }
-                    }
-                }
-            )
-
-            _isLoading.value = false
-            */
         }
     }
 
@@ -208,10 +145,10 @@ class MusicViewModel(
     }
 
     /**
-     * 获取音乐推荐
-     * @param mood 心情
-     * @param intensity 强度
-     * @param weather 天气数据（可选，默认使用当前获取的天气）
+     * Get Music Recommendation
+     * @param mood
+     * @param intensity
+     * @param weather
      */
     fun getRecommendations(
         mood: String,
@@ -222,19 +159,13 @@ class MusicViewModel(
             _isLoading.value = true
             _errorMessage.value = null
 
-            // 这里可以基于天气和心情的组合来调整推荐逻辑
-            // 例如：如果天气是雨天，且心情是平静/伤心，推荐一些舒缓的音乐
-            // 暂时使用原有逻辑，未来可扩展
-
             spotifyRepository.getRecommendations(mood, intensity).fold(
                 onSuccess = { songs ->
                     if (songs.isNotEmpty()) {
                         _recommendations.value = songs
                         _errorMessage.value = null
                     } else {
-                        // 如果没有获取到推荐，使用默认数据
                         _errorMessage.value = "No recommendations found. Showing trending songs instead."
-                        // 尝试获取热门歌曲
                         getTrendingSongs()
                     }
                     _isLoading.value = false
@@ -242,10 +173,8 @@ class MusicViewModel(
                 onFailure = { error ->
                     _errorMessage.value = "Failed to get recommendations: ${error.message}"
                     Log.e("MusicViewModel", "Recommendation API error: ${error.message}", error)
-                    
-                    // 使用默认数据
+
                     if (_recommendations.value.isEmpty()) {
-                        // 提供备用数据
                         _recommendations.value = getDefaultSongs()
                     }
                     
@@ -255,7 +184,7 @@ class MusicViewModel(
         }
     }
 
-    // 播放控制方法
+
     fun playSong(song: Song) {
         playerManager.playSong(song)
     }
@@ -297,15 +226,15 @@ class MusicViewModel(
         playerManager.disconnect()
     }
 
-    // 保存心情记录
+    // Record the Mood
     fun saveMoodEntry(entry: MoodEntry) {
         viewModelScope.launch {
             try {
-                // 使用dao直接访问数据库
+                // Access Database
                 dao.insert(entry)
-                Log.d("MusicViewModel", "成功保存心情记录: ${entry.date}")
+                Log.d("MusicViewModel", "Record the mood successfully: ${entry.date}")
             } catch (e: Exception) {
-                Log.e("MusicViewModel", "保存心情记录失败: ${e.message}", e)
+                Log.e("MusicViewModel", "Fail to record mood: ${e.message}", e)
             }
         }
     }
@@ -318,7 +247,6 @@ class MusicViewModel(
 
     fun loadEntriesForMonth(year: Int, month: Int) {
         viewModelScope.launch {
-            // 格式化月份，确保单位数月份前面加0
             val monthStr = String.format("%04d-%02d", year, month + 1)
             val monthPattern = "$monthStr%"
             _monthEntries.value = dao.getEntriesForMonth(monthPattern)
@@ -345,21 +273,21 @@ class MusicViewModel(
                 // Set loading state
                 _isLoading.value = true
                 
-                // 清除现有的AI推荐，确保UI显示加载状态
+                // Always update UI
                 _aiRecommendation.value = null
                 
                 // Create AI recommendation repository
                 val aiRepository = AIRecommendationRepository()
                 
-                // 从数据库加载最新的心情测试结果
+                // Load newest test result
                 val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
                 val moodEntry = dao.getEntryByDate(today)
                 
-                // 为情绪添加随机波动，增加推荐多样性
+                // be creative
                 val moodVariation = (Random.nextFloat() * 10f - 5f)
                 val adjustedMoodScore = (moodScore + moodVariation).coerceIn(0f, 100f)
-                
-                // 确保AI推荐与当前心情一致
+
+
                 val dominantMood = moodEntry?.result ?: when {
                     adjustedMoodScore >= 80 -> "happy"
                     adjustedMoodScore >= 60 -> "relaxed"
@@ -368,9 +296,9 @@ class MusicViewModel(
                     else -> "sad"
                 }
                 
-                Log.d("MusicViewModel", "获取AI推荐，心情结果: $dominantMood，原始分数: $moodScore，调整后分数: $adjustedMoodScore")
+                Log.d("MusicViewModel", "Get AI recommendation, Test result: $dominantMood, origin score: $moodScore, weighted score: $adjustedMoodScore")
                 
-                // 随机选择一些关键词，而不是使用全部，增加变化
+                // Random choose
                 val shuffledKeywords = keywords.shuffled()
                 val selectedKeywords = if (shuffledKeywords.size > 2) {
                     val randomCount = Random.nextInt(2, shuffledKeywords.size + 1)
@@ -385,15 +313,15 @@ class MusicViewModel(
                     keywords = selectedKeywords,
                     lyric = lyric,
                     weather = weather,
-                    matchMood = true, // 始终使用匹配心情模式
-                    dominantMood = dominantMood // 添加主导心情数据
+                    matchMood = true,
+                    dominantMood = dominantMood
                 )
                 
                 // Get recommendations
                 val recommendation = try {
                     aiRepository.recommendWithOpenAI(userData)
                 } catch (e: Exception) {
-                    // 显示具体API错误，不再提供模拟数据
+                    // Display detailed API error message
                     _errorMessage.value = "AI recommendation failed: ${e.message}"
                     Log.e("MusicViewModel", "AI recommendation API call failed", e)
                     _isLoading.value = false
@@ -403,7 +331,7 @@ class MusicViewModel(
                 // Store recommendation results
                 _aiRecommendation.value = recommendation
                 
-                // 先清空现有的推荐列表，确保UI更新
+                // Always update UI
                 _recommendations.value = emptyList()
                 
                 // Create playlist from recommendations
@@ -413,7 +341,7 @@ class MusicViewModel(
                 _errorMessage.value = null
             } catch (e: Exception) {
                 Log.e("MusicViewModel", "Failed to get AI recommendations: ${e.message}", e)
-                _errorMessage.value = "获取推荐失败: ${e.message}"
+                _errorMessage.value = "Can't get recommendation: ${e.message}"
             } finally {
                 // Clear loading state
                 _isLoading.value = false
@@ -430,10 +358,10 @@ class MusicViewModel(
             _isLoading.value = true
             _errorMessage.value = null
             
-            Log.d("MusicViewModel", "开始处理AI推荐歌曲，总数: ${recommendedSongs.size}")
-            
-            // 显示处理过程
-            _errorMessage.value = "正在从Spotify获取歌曲信息..."
+            Log.d("MusicViewModel", "Start loading AI recommendations, total number: ${recommendedSongs.size}")
+
+
+            _errorMessage.value = "Loading song information from Spotify..."
             
             // Create result list
             val resultSongs = mutableListOf<Song>()
@@ -444,7 +372,7 @@ class MusicViewModel(
                 try {
                     // Process the result
                     val searchTerm = songInfo.trim()
-                    Log.d("MusicViewModel", "搜索歌曲($index): $searchTerm")
+                    Log.d("MusicViewModel", "Search($index): $searchTerm")
                     
                     // Search for the song
                     spotifyRepository.searchMusic(searchTerm).fold(
@@ -453,23 +381,22 @@ class MusicViewModel(
                                 // Add the first matching result
                                 val song = songs[0]
                                 resultSongs.add(song)
-                                Log.d("MusicViewModel", "找到歌曲: ${song.title} - ${song.artist}, URL: ${song.coverUrl}")
+                                Log.d("MusicViewModel", "Found: ${song.title} - ${song.artist}, URL: ${song.coverUrl}")
                                 
-                                // 更新提示信息
-                                _errorMessage.value = "已找到 ${resultSongs.size}/${recommendedSongs.size} 首歌曲..."
+                                // Update msg
+                                _errorMessage.value = "Found ${resultSongs.size}/${recommendedSongs.size} songs..."
                             } else {
-                                Log.w("MusicViewModel", "没有找到匹配歌曲: $searchTerm")
+                                Log.w("MusicViewModel", "No match songs: $searchTerm")
                                 failedSongs.add(searchTerm)
                             }
                         },
                         onFailure = { error ->
                             // Log error but continue processing other songs
-                            Log.e("MusicViewModel", "搜索歌曲失败: $searchTerm, ${error.message}")
+                            Log.e("MusicViewModel", "Can't find song: $searchTerm, ${error.message}")
                             failedSongs.add(searchTerm)
                         }
                     )
-                    
-                    // 稍微延迟，避免API请求过于频繁
+
                     kotlinx.coroutines.delay(100)
                     
                 } catch (e: Exception) {
@@ -481,19 +408,18 @@ class MusicViewModel(
             // Update recommendation results
             if (resultSongs.isNotEmpty()) {
                 _recommendations.value = resultSongs
-                _errorMessage.value = null  // 清除状态消息
+                _errorMessage.value = null
                 
-                // 如果有歌曲未找到，显示提示
+                // If can't find songs
                 if (failedSongs.isNotEmpty()) {
-                    _errorMessage.value = "已创建歌单，但有${failedSongs.size}首歌曲未找到"
+                    _errorMessage.value = "Playlist created, But ${failedSongs.size} songs missing"
                 }
                 
-                // 播放第一首歌
+                // Play the first song
                 playSong(resultSongs[0])
                 
-                Log.d("MusicViewModel", "成功创建歌单，共${resultSongs.size}首歌曲")
+                Log.d("MusicViewModel", "Playlist created, ${resultSongs.size} songs in total")
             } else {
-                // 没有找到任何歌曲
                 _errorMessage.value = "No Songs found"
                 Log.e("MusicViewModel", "Can't create playlist")
             }
@@ -503,8 +429,7 @@ class MusicViewModel(
     }
 
     /**
-     * 获取最新发行的歌曲
-     * 从Spotify新发行榜单获取最新发布的歌曲
+     * Get the new posted songs from Spotify
      */
     fun getTrendingSongs() {
         viewModelScope.launch {
@@ -515,42 +440,31 @@ class MusicViewModel(
                 onSuccess = { songs ->
                     if (songs.isNotEmpty()) {
                         _trendingSongs.value = songs
-                        
-                        // 如果没有推荐歌曲，也将热门歌曲设置为推荐
+
                         if (_recommendations.value.isEmpty()) {
                             _recommendations.value = songs
                         }
-                        
-                        // 成功获取到歌曲，清除错误消息
+
                         _errorMessage.value = null
                     } else {
-                        // 如果没有获取到歌曲，使用默认数据
                         _trendingSongs.value = getDefaultSongs()
-                        
-                        // 如果没有推荐歌曲，也将默认歌曲设置为推荐
+
                         if (_recommendations.value.isEmpty()) {
                             _recommendations.value = getDefaultSongs()
                         }
-                        
-                        // 此时不需要显示错误消息，因为我们有备用数据
                     }
                     
                     _isLoading.value = false
                 },
                 onFailure = { error ->
-                    // 记录错误但不显示给用户，因为我们有备用数据
                     Log.e("MusicViewModel", "Trending songs API error: ${error.message}", error)
-                    
-                    // 使用默认数据
+
                     _trendingSongs.value = getDefaultSongs()
-                    
-                    // 如果没有推荐歌曲，也将默认歌曲设置为推荐
+
                     if (_recommendations.value.isEmpty()) {
                         _recommendations.value = getDefaultSongs()
                     }
-                    
-                    // 注意：这里我们让SpotifyRepository已经返回了成功结果，所以这个分支不应该再被执行
-                    // 但为了安全起见，我们仍然保留这个处理
+
                     _errorMessage.value = null
                     _isLoading.value = false
                 }
@@ -559,7 +473,7 @@ class MusicViewModel(
     }
 
     /**
-     * 获取默认歌曲列表，用于API调用失败时的备用数据
+     * Default Song list (hardcoded)
      */
     private fun getDefaultSongs(): List<Song> {
         return listOf(

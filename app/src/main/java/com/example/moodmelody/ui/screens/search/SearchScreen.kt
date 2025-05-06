@@ -42,7 +42,6 @@ import com.example.moodmelody.network.RetrofitClient
 import com.example.moodmelody.viewmodel.MusicViewModel
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
     navController: NavController,
@@ -52,20 +51,18 @@ fun SearchScreen(
     var searchQuery by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
     
-    // 从 ViewModel 获取数据
+    // Get data from ViewModel
     val isLoading by viewModel.isLoading.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
-    val recommendations by viewModel.recommendations.collectAsState()
     val trendingSongs by viewModel.trendingSongs.collectAsState()
     
-    // 检查Spotify令牌状态
+    // Check Spotify token
     val hasSpotifyToken = remember { RetrofitClient.hasToken() }
     
-    // 只有在有Spotify令牌的情况下才加载推荐和热门歌曲
+    // Only load recommendation and trend songs with Spotify token
     LaunchedEffect(hasSpotifyToken) {
         if (hasSpotifyToken) {
-            // 优先加载热门歌曲
             if (trendingSongs.isEmpty()) {
                 viewModel.getTrendingSongs()
             }
@@ -78,7 +75,6 @@ fun SearchScreen(
             .padding(paddingValues)
             .padding(16.dp)
     ) {
-        // 搜索框
         SearchBar(
             query = searchQuery,
             onQueryChange = { searchQuery = it },
@@ -87,9 +83,6 @@ fun SearchScreen(
                     coroutineScope.launch {
                         viewModel.searchMusic(searchQuery)
                     }
-                } else if (searchQuery.isNotEmpty() && !hasSpotifyToken) {
-                    // 提示用户需要先登录Spotify
-                    // 这里可以通过ViewModel或SnackBar通知用户
                 }
             },
             onClear = { searchQuery = "" },
@@ -97,10 +90,8 @@ fun SearchScreen(
         )
         
         Spacer(modifier = Modifier.height(16.dp))
-        
-        // 搜索结果
+
         if (searchQuery.isEmpty()) {
-            // 如果没有搜索词，显示热门推荐
             Text(
                 text = "New Releases",
                 style = MaterialTheme.typography.headlineMedium,
@@ -109,7 +100,6 @@ fun SearchScreen(
             )
             
             if (!hasSpotifyToken) {
-                // 如果没有Spotify令牌，显示登录提示
                 SpotifyLoginPrompt()
             } else if (isLoading) {
                 Box(
@@ -144,9 +134,8 @@ fun SearchScreen(
                     }
                 }
             } else if (errorMessage?.contains("404") == true) {
-                // 404错误时特殊处理，但仍然显示歌曲
+                // For 404 Error
                 if (trendingSongs.isNotEmpty()) {
-                    // 展示一个轻量级的信息提示，而不是全屏错误
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -174,8 +163,7 @@ fun SearchScreen(
                             )
                         }
                     }
-                    
-                    // 展示歌曲列表
+
                     LazyColumn(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
@@ -187,11 +175,10 @@ fun SearchScreen(
                         }
                     }
                 } else {
-                    // 这种情况不太可能出现，但仍提供一个处理方式
                     ShowErrorWithRetryButton(errorMessage, viewModel)
                 }
             } else if (errorMessage != null) {
-                // 处理其他类型的错误
+                // Error management
                 ShowErrorWithRetryButton(errorMessage, viewModel)
             } else {
                 LazyColumn(
@@ -206,7 +193,6 @@ fun SearchScreen(
                 }
             }
         } else {
-            // 显示搜索结果
             AnimatedVisibility(
                 visible = isLoading,
                 enter = fadeIn(animationSpec = tween(300)),
@@ -226,10 +212,8 @@ fun SearchScreen(
                 exit = fadeOut(animationSpec = tween(300))
             ) {
                 if (!hasSpotifyToken) {
-                    // 显示Spotify登录提示
                     SpotifyLoginPrompt()
                 } else if (searchResults.isEmpty() && searchQuery.isNotEmpty() && errorMessage == null) {
-                    // 没有搜索结果
                     Column(
                         modifier = Modifier.fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -247,7 +231,6 @@ fun SearchScreen(
                         )
                     }
                 } else if (errorMessage != null) {
-                    // 显示错误信息
                     Column(
                         modifier = Modifier.fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -265,7 +248,6 @@ fun SearchScreen(
                         )
                     }
                 } else {
-                    // 有搜索结果
                     Text(
                         text = "Search Results",
                         style = MaterialTheme.typography.headlineMedium,
@@ -289,7 +271,6 @@ fun SearchScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchBar(
     query: String,
@@ -299,7 +280,6 @@ fun SearchBar(
     isSearching: Boolean,
     modifier: Modifier = Modifier
 ) {
-    // 在Composable函数内部获取键盘控制器
     val keyboardController = LocalSoftwareKeyboardController.current
     
     Surface(
@@ -375,7 +355,6 @@ fun SearchBar(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchResultItem(
     song: Song,
@@ -397,7 +376,6 @@ fun SearchResultItem(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 封面图片
             Box(
                 modifier = Modifier
                     .size(64.dp)
@@ -427,8 +405,7 @@ fun SearchResultItem(
             }
             
             Spacer(modifier = Modifier.width(16.dp))
-            
-            // 歌曲信息
+
             Column(
                 modifier = Modifier.weight(1f)
             ) {
@@ -450,8 +427,7 @@ fun SearchResultItem(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            
-            // 播放按钮
+
             IconButton(
                 onClick = onClick,
                 modifier = Modifier
@@ -491,7 +467,7 @@ private fun SpotifyLoginPrompt() {
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Spotify登录按钮
+            // Spotify Log in Button
             Button(onClick = {
                 val clientId = "7f598bd5b59b4884b4e5db9997a05cc1" 
                 val redirectUri = "moodmelody://callback"

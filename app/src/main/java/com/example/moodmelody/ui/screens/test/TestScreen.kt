@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,7 +35,6 @@ import java.util.Locale
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.text.font.FontStyle
 
@@ -51,7 +48,6 @@ data class LyricOption(
     val emotions: Emotions
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TestScreen(navController: NavController) {
     // 使用LocalContext获取上下文
@@ -79,7 +75,6 @@ fun TestScreen(navController: NavController) {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomTestScreen(
     viewModel: MusicViewModel,
@@ -895,7 +890,6 @@ fun getFilteredLyrics(
     // 根据心情滑块值确定情绪倾向
     val isHappy = moodValue >= 0.6f
     val isSad = moodValue <= 0.4f
-    val isNeutral = moodValue > 0.4f && moodValue < 0.6f
     
     // 基于关键词计算平均情绪值
     val keywordEmotions = keywordOptions

@@ -48,10 +48,9 @@ fun HomeScreen(
     val recommendations by viewModel.recommendations.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     
-    // AI推荐结果
+    // AI Recommendation Result
     val aiRecommendation by viewModel.aiRecommendation.collectAsStateWithLifecycle()
-    
-    // 添加最新的心情测试结果
+
     val latestMoodEntry by viewModel.loadedEntry.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsState()
     
@@ -60,7 +59,7 @@ fun HomeScreen(
     
     // Auto-load latest mood entry and recommendations when page loads
     LaunchedEffect(Unit) {
-        // 加载今天的心情记录
+        // Load the mood entry
         val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
         val today = dateFormat.format(java.util.Date())
         viewModel.loadEntryByDate(today)
@@ -70,16 +69,13 @@ fun HomeScreen(
             viewModel.getRecommendations(mood = "happy", intensity = 3)
         }
     }
-    
-    // 当加载到最新的心情测试结果且没有AI推荐时，自动生成AI推荐
+
     LaunchedEffect(latestMoodEntry) {
         if (latestMoodEntry != null) {
-            // 无论是否已有推荐，都根据最新的心情更新推荐
-            // 根据心情记录生成AI推荐
+            // Always recommend based on newest test result
             val entry = latestMoodEntry!!
             val weather = currentWeather?.text ?: "sunny"
-            
-            // 获取主导情绪值作为心情分数
+
             val moodScore = when(entry.result) {
                 "happy" -> entry.happy
                 "sad" -> entry.sad
@@ -87,11 +83,9 @@ fun HomeScreen(
                 "excited" -> entry.excited
                 else -> 0.5f
             }
-            
-            // 显示正在生成的提示
+
             Toast.makeText(context, "Updating recommendations based on your new mood...", Toast.LENGTH_SHORT).show()
-            
-            // 获取AI推荐
+
             viewModel.getAIRecommendation(
                 moodScore = moodScore,
                 keywords = entry.keywords,
@@ -99,13 +93,11 @@ fun HomeScreen(
                 weather = weather,
                 matchMood = true
             )
-            
-            // 同时刷新常规音乐推荐
+
             viewModel.getRecommendations(mood = entry.result, intensity = 3)
         }
     }
-    
-    // 处理推荐失败的情况
+
     LaunchedEffect(errorMessage) {
         errorMessage?.let { error ->
             Toast.makeText(context, error, Toast.LENGTH_LONG).show()
@@ -120,7 +112,6 @@ fun HomeScreen(
             .verticalScroll(scrollState)
             .padding(16.dp)
     ) {
-        // 显示最新的心情测试结果
         latestMoodEntry?.let { entry ->
             Card(
                 modifier = Modifier
@@ -144,8 +135,7 @@ fun HomeScreen(
                     )
                     
                     Spacer(modifier = Modifier.height(16.dp))
-                    
-                    // 心情大型emoji显示
+
                     Text(
                         text = when(entry.result) {
                             "happy" -> "😊"
@@ -159,8 +149,7 @@ fun HomeScreen(
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(16.dp)
                     )
-                    
-                    // 显示心情类型
+
                     Text(
                         text = when(entry.result) {
                             "happy" -> "Happy"
@@ -197,7 +186,7 @@ fun HomeScreen(
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    // 关键词标签
+                    // label
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -213,10 +202,10 @@ fun HomeScreen(
                         }
                     }
                     
-                    // 查看详情按钮
+                    // detail button
                     Button(
                         onClick = {
-                            // 导航到统计页面
+                            // navigate to stats page
                             navController.navigate(Screen.Stats.route)
                         },
                         modifier = Modifier.padding(top = 8.dp)
@@ -226,8 +215,7 @@ fun HomeScreen(
                 }
             }
         }
-        
-        // AI推荐结果显示区域 - 只在有AI推荐时显示
+
         aiRecommendation?.let { recommendation ->
             Card(
                 modifier = Modifier
@@ -259,8 +247,7 @@ fun HomeScreen(
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
-                    
-                    // 显示推荐歌曲
+
                     recommendation.suggestedSongs.forEach { songTitle ->
                         Row(
                             modifier = Modifier
@@ -418,7 +405,6 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 修改逻辑：不在有推荐时显示"Get Music Recommendations Based on Your Mood"标题
                 Text(
                     text = when {
                         recommendations.isNotEmpty() -> "Recommendations for You"
@@ -435,8 +421,7 @@ fun HomeScreen(
                     )
                 }
             }
-            
-            // 显示错误信息（如有）- 但仅当没有推荐歌曲时才显示
+
             errorMessage?.let { error ->
                 if (error.isNotEmpty() && recommendations.isEmpty()) {
                     Card(
@@ -471,27 +456,24 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(16.dp))
             
             if (recommendations.isNotEmpty()) {
-                // Display recommendations from ViewModel - 使用增强版卡片
+                // Display recommendations from ViewModel
                 Column(
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // 标题
                     Text(
                         text = "Recommended Playlist",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
-                    
-                    // 歌曲计数
+
                     Text(
                         text = "Total: ${recommendations.size} songs",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
-                    
-                    // 歌曲列表
+
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         modifier = Modifier.fillMaxWidth()

@@ -1,7 +1,7 @@
 package com.example.moodmelody.model
 
 /**
- * AI推荐结果
+ * AI Recommendation Result
  */
 data class Recommendation(
     val summary: String,               // GPT-4.1 返回的摘要
@@ -9,12 +9,12 @@ data class Recommendation(
 )
 
 /**
- * 自定义异常：AI推荐失败
+ * AI Recommendation Failure
  */
 class AIRecommendationException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /**
- * OpenAI请求消息
+ * OpenAI Request Message
  */
 data class OpenAIMessage(
     val role: String,
@@ -22,7 +22,7 @@ data class OpenAIMessage(
 )
 
 /**
- * OpenAI请求体
+ * OpenAI Request
  */
 data class OpenAIRequest(
     val model: String,
@@ -35,7 +35,7 @@ data class OpenAIRequest(
 )
 
 /**
- * OpenAI响应体中的选择
+ * OpenAI Choice
  */
 data class OpenAIChoice(
     val index: Int,
@@ -44,7 +44,7 @@ data class OpenAIChoice(
 )
 
 /**
- * OpenAI响应体
+ * OpenAI Response
  */
 data class OpenAIResponse(
     val id: String,
@@ -56,7 +56,7 @@ data class OpenAIResponse(
 )
 
 /**
- * OpenAI响应体中的使用统计
+ * OpenAI Usage
  */
 data class OpenAIUsage(
     val prompt_tokens: Int,
