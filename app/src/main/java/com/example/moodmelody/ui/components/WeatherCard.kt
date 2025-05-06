@@ -27,13 +27,13 @@ fun WeatherCard(
     emoji: String,
     modifier: Modifier = Modifier
 ) {
-    // 根据天气类型选择不同的渐变色
+    // Select different gradient colors based on weather type
     val (startColor, endColor) = when {
-        emoji.contains("☀️") -> Pair(Color(0xFFFFA726), Color(0xFFFFCC80)) // 晴天橙色
-        emoji.contains("🌧️") || emoji.contains("☔") -> Pair(Color(0xFF5C6BC0), Color(0xFF9FA8DA)) // 雨天蓝紫色
-        emoji.contains("☁️") -> Pair(Color(0xFF78909C), Color(0xFFB0BEC5)) // 阴天灰色
-        emoji.contains("❄️") -> Pair(Color(0xFF4FC3F7), Color(0xFFB3E5FC)) // 雪天天蓝色
-        else -> Pair(Color(0xFF7E57C2), Color(0xFFB39DDB)) // 默认紫色
+        emoji.contains("☀️") -> Pair(Color(0xFFFFA726), Color(0xFFFFCC80)) // Sunny orange
+        emoji.contains("🌧️") || emoji.contains("☔") -> Pair(Color(0xFF5C6BC0), Color(0xFF9FA8DA)) // Rainy blue-purple
+        emoji.contains("☁️") -> Pair(Color(0xFF78909C), Color(0xFFB0BEC5)) // Cloudy gray
+        emoji.contains("❄️") -> Pair(Color(0xFF4FC3F7), Color(0xFFB3E5FC)) // Snowy light blue
+        else -> Pair(Color(0xFF7E57C2), Color(0xFFB39DDB)) // Default purple
     }
     
     val elevation by animateFloatAsState(targetValue = 2f)
@@ -59,7 +59,7 @@ fun WeatherCard(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 左侧天气信息
+            // Left side weather information
             Column(
                 modifier = Modifier.weight(1f)
             ) {
@@ -86,7 +86,7 @@ fun WeatherCard(
                 )
             }
             
-            // 右侧天气图标
+            // Right side weather icon
             Text(
                 text = emoji,
                 style = MaterialTheme.typography.displayMedium,

@@ -37,91 +37,94 @@ fun MiniPlayer(
 ) {
     val elevation by animateDpAsState(targetValue = 6.dp)
     
-    Surface(
+    Card(
         modifier = modifier
             .fillMaxWidth()
             .height(72.dp)
-            .shadow(elevation = elevation, shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-            .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.primaryContainer,
-        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-        tonalElevation = 2.dp
+            .clip(RoundedCornerShape(16.dp)),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
+        )
     ) {
-        // 背景渐变
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primaryContainer,
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Background gradient
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
+                            )
                         )
                     )
-                )
-        ) {
+            )
+            
             Row(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 封面图
+                // Cover image
                 AsyncImage(
                     model = "https://example.com/cover1.jpg",
-                    contentDescription = "当前播放歌曲封面",
+                    contentDescription = "Current playing song cover",
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .size(48.dp)
-                        .clip(RoundedCornerShape(12.dp)),
-                    contentScale = ContentScale.Crop
+                        .clip(RoundedCornerShape(8.dp))
                 )
                 
-                Spacer(modifier = Modifier.width(16.dp))
-                
-                // 歌曲信息
+                // Song information
                 Column(
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 16.dp)
                 ) {
                     Text(
                         text = songTitle,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    if (artistName.isNotEmpty()) {
-                        Text(
-                            text = artistName,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    
+                    Text(
+                        text = artistName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
                 
-                // 播放控制
+                // Playback controls
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(
-                        onClick = onPlayPauseClick
+                        onClick = onPlayPauseClick,
+                        modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
                             imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (isPlaying) "暂停" else "播放",
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            contentDescription = if (isPlaying) "Pause" else "Play",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     
                     IconButton(
-                        onClick = onNextClick
+                        onClick = onNextClick,
+                        modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.SkipNext,
-                            contentDescription = "下一首",
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            contentDescription = "Next",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

@@ -5,99 +5,106 @@ import android.util.Log
 import com.example.moodmelody.Song
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 private const val TAG = "SpotifyPlayerManager"
-private const val CLIENT_ID = "7f598bd5b59b4884b4e5db9997a05cc1" // 您的Spotify客户端ID
+private const val CLIENT_ID = "7f598bd5b59b4884b4e5db9997a05cc1" // Your Spotify Client ID
 private const val REDIRECT_URI = "moodmelody://callback"
 
 /**
- * 管理Spotify播放器的类，目前实现为模拟播放
+ * Class that manages Spotify player, currently implemented as a simulation
  */
 class SpotifyPlayerManager(private val context: Context) {
 
     private val _isConnected = MutableStateFlow(false)
-    val isConnected: StateFlow<Boolean> = _isConnected
+    val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
 
     private val _currentSong = MutableStateFlow<Song?>(null)
-    val currentSong: StateFlow<Song?> = _currentSong
+    val currentSong: StateFlow<Song?> = _currentSong.asStateFlow()
 
     private val _isPlaying = MutableStateFlow(false)
-    val isPlaying: StateFlow<Boolean> = _isPlaying
+    val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
     /**
-     * 尝试连接到Spotify应用
+     * Attempt to connect to Spotify app
      */
     fun connect() {
-        Log.d(TAG, "模拟连接到Spotify")
+        Log.d(TAG, "Simulating connection to Spotify")
         _isConnected.value = true
     }
 
     /**
-     * 断开与Spotify的连接
+     * Disconnect from Spotify
      */
     fun disconnect() {
-        Log.d(TAG, "模拟断开Spotify连接")
+        Log.d(TAG, "Simulating disconnection from Spotify")
         _isConnected.value = false
         _isPlaying.value = false
     }
 
     /**
-     * 播放指定歌曲
+     * Play specified song
      */
     fun playSong(song: Song) {
         if (_isConnected.value) {
-            Log.d(TAG, "模拟播放歌曲: ${song.title}")
+            Log.d(TAG, "Simulating playing song: ${song.title}")
             _currentSong.value = song
             _isPlaying.value = true
         } else {
-            Log.e(TAG, "无法播放歌曲，Spotify未连接")
+            Log.e(TAG, "Cannot play song, Spotify not connected")
         }
     }
 
     /**
-     * 暂停当前播放
+     * Pause current playback
      */
     fun pause() {
-        if (_isPlaying.value) {
-            Log.d(TAG, "模拟暂停播放")
+        if (_isConnected.value && _isPlaying.value) {
+            Log.d(TAG, "Simulating pause playback")
             _isPlaying.value = false
         }
     }
 
     /**
-     * 恢复播放
+     * Resume playback
      */
     fun resume() {
-        if (_isConnected.value && _currentSong.value != null && !_isPlaying.value) {
-            Log.d(TAG, "模拟恢复播放")
+        if (_isConnected.value && !_isPlaying.value && _currentSong.value != null) {
+            Log.d(TAG, "Simulating resume playback")
             _isPlaying.value = true
         }
     }
 
     /**
-     * 停止播放
+     * Stop playback
      */
     fun stop() {
-        if (_isPlaying.value) {
-            Log.d(TAG, "模拟停止播放")
+        if (_isConnected.value) {
+            Log.d(TAG, "Simulating stop playback")
             _isPlaying.value = false
             _currentSong.value = null
         }
     }
 
     /**
-     * 跳转到下一首歌
+     * Skip to next song
      */
     fun skipToNext() {
-        Log.d(TAG, "模拟跳转到下一首歌")
-        // 在实际应用中，这里应该有队列管理逻辑
+        if (_isConnected.value) {
+            Log.d(TAG, "Simulating skip to next")
+            // In a real implementation, would request next track from Spotify
+            // For simulation, just keep playing
+        }
     }
 
     /**
-     * 跳转到上一首歌
+     * Skip to previous song
      */
     fun skipToPrevious() {
-        Log.d(TAG, "模拟跳转到上一首歌")
-        // 在实际应用中，这里应该有队列管理逻辑
+        if (_isConnected.value) {
+            Log.d(TAG, "Simulating skip to previous")
+            // In a real implementation, would request previous track from Spotify
+            // For simulation, just keep playing
+        }
     }
 }

@@ -13,12 +13,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import com.example.moodmelody.data.MoodDatabase
 import com.example.moodmelody.data.MoodEntry
-import android.app.Application
 import android.util.Log
 import com.example.moodmelody.repository.AIRecommendationRepository
 import com.example.moodmelody.model.UserData
 import com.example.moodmelody.model.Recommendation
-import kotlinx.coroutines.delay
 import kotlin.random.Random
 import kotlin.collections.shuffled
 
@@ -279,18 +277,18 @@ class MusicViewModel(
     }
 
     /**
-     * 获取天气图标对应的表情
+     * Get emoji for weather icon code
      */
     fun getWeatherEmoji(iconCode: String): String {
         return when {
-            iconCode.startsWith("1") -> "☀️" // 晴天
-            iconCode.startsWith("3") -> "🌥️" // 多云
-            iconCode.startsWith("4") -> "☁️" // 阴天
-            iconCode.startsWith("5") -> "🌧️" // 雨天
-            iconCode.startsWith("6") -> "❄️" // 雪
-            iconCode.startsWith("7") -> "🌫️" // 雾霾
-            iconCode.startsWith("8") -> "🌪️" // 风暴
-            else -> "🌈" // 其他
+            iconCode.startsWith("1") -> "☀️" // Sunny
+            iconCode.startsWith("3") -> "🌥️" // Partly cloudy
+            iconCode.startsWith("4") -> "☁️" // Cloudy
+            iconCode.startsWith("5") -> "🌧️" // Rainy
+            iconCode.startsWith("6") -> "❄️" // Snow
+            iconCode.startsWith("7") -> "🌫️" // Fog/haze
+            iconCode.startsWith("8") -> "🌪️" // Storm
+            else -> "🌈" // Other
         }
     }
 

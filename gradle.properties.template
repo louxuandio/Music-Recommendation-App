@@ -22,8 +22,8 @@ kotlin.code.style=official
 # thereby reducing the size of the R class for that library
 android.nonTransitiveRClass=true
 
-# OpenAI API Key - 请替换为您自己的API密钥
-OPENAI_API_KEY=sk-your-api-key-here
+# OpenAI API Key - Please replace with your own API key
+OPENAI_API_KEY=your_openai_api_key_here
 
-# 指定使用Android Studio内置的JBR路径 - 根据您的安装路径修改
+# Specify the path to the built-in JBR - modify according to your installation path
 org.gradle.java.home=D:\\Android Studio\\jbr 

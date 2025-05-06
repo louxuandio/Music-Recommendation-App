@@ -1,51 +1,51 @@
-# MoodMelody 应用改进说明
+# MoodMelody App Improvement Notes
 
-## 更新摘要
+## Update Summary
 
-本次更新在保持原有UI优化的同时，恢复了所有原有功能，包括底部导航栏、测试流程、迷你播放器以及数据请求和处理。
+This update maintains all the original functionality while preserving the original UI optimizations, including the bottom navigation bar, testing process, mini player, and data request and processing.
 
-## 修改的文件
+## Modified Files
 
-### 核心改进
+### Core Improvements
 
-1. **MainActivity.kt** - 重新实现了主活动界面，添加了底部导航栏和迷你播放器。
+1. **MainActivity.kt** - Reimplemented the main activity interface, adding the bottom navigation bar and mini player.
 
-2. **Navigation.kt** - 更新了导航系统，添加了对 MusicViewModel 和内边距的支持。
+2. **Navigation.kt** - Updated the navigation system, adding support for MusicViewModel and padding.
 
-3. **MiniPlayer.kt** - 改进了迷你播放器，使其与 MusicViewModel 集成，以控制音乐播放。
+3. **MiniPlayer.kt** - Improved the mini player, integrating it with MusicViewModel to control music playback.
 
-4. **HomeScreen.kt** - 连接到 ViewModel，支持实时天气数据和音乐推荐。
+4. **HomeScreen.kt** - Connected to ViewModel, supporting real-time weather data and music recommendations.
 
-5. **SearchScreen.kt** - 完全重构，支持实时搜索和与 MusicViewModel 集成。
+5. **SearchScreen.kt** - Completely re-implemented, supporting real-time search and integration with MusicViewModel.
 
-6. **StatsScreen.kt** - 改进了统计屏幕，添加了对实际数据库查询的支持。
+6. **StatsScreen.kt** - Improved the statistics screen, adding support for actual database queries.
 
-7. **SpotifyRepository.kt** 和 **WeatherRepository.kt** - 使用示例数据代替实际 API 调用，保持方法签名不变。
+7. **SpotifyRepository.kt** and **WeatherRepository.kt** - Used example data instead of actual API calls, keeping method signatures unchanged.
 
-### 新增的文件
+### New Files
 
-1. **SampleData.kt** - 提供了示例歌曲、推荐和搜索功能，用于开发和测试。
+1. **SampleData.kt** - Provided example songs, recommendations, and search functionality for development and testing.
 
-## 主要功能恢复
+## Main Functionality Restoration
 
-1. **底部导航栏** - 实现了四个选项卡（主页、搜索、测试、统计），使用了 Navigation Compose。
+1. **Bottom Navigation Bar** - Implemented four tabs (Home, Search, Test, Stats) using Navigation Compose.
 
-2. **迷你播放器** - 添加在底部导航栏上方，显示当前播放的歌曲，连接到 SpotifyPlayerManager。
+2. **Mini Player** - Added above the bottom navigation bar, displaying the currently playing song, connected to SpotifyPlayerManager.
 
-3. **天气卡片** - 显示城市、温度和天气信息，使用 WeatherRepository 提供数据。
+3. **Weather Card** - Displayed city, temperature, and weather information using WeatherRepository for data.
 
-4. **音乐推荐** - 基于心情和天气提供个性化推荐，使用 SpotifyRepository。
+4. **Music Recommendations** - Provided personalized recommendations based on mood and weather using SpotifyRepository.
 
-5. **测试流程** - 恢复三步情绪测试，用于获取用户情绪状态并提供音乐推荐。
+5. **Testing Process** - Restored three-step emotional test for obtaining user emotional state and providing music recommendations.
 
-## 技术改进
+## Technical Improvements
 
-1. **状态管理** - 使用 MusicViewModel 统一管理应用状态，与 Compose 状态系统集成。
+1. **State Management** - Used MusicViewModel to manage application state, integrating with Compose state system.
 
-2. **数据流** - 使用 StateFlow 提供响应式的数据流更新。
+2. **Data Flow** - Used StateFlow for responsive data flow updates.
 
-3. **依赖注入** - 简化了组件间的依赖关系，遵循单一职责原则。
+3. **Dependency Injection** - Simplified component dependency relationships, adhering to single responsibility principle.
 
-4. **界面一致性** - 保持了统一的设计语言和用户体验。
+4. **Interface Consistency** - Maintained uniform design language and user experience.
 
-5. **响应式界面** - 界面会根据数据状态自动更新，无需手动刷新。 
+5. **Responsive Interface** - Interface automatically updates based on data state, no manual refresh required. 

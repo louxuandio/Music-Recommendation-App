@@ -1,6 +1,6 @@
 package com.example.moodmelody.ui.screens.home
 
-import androidx.compose.foundation.background
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -11,33 +11,24 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.moodmelody.Song
 import com.example.moodmelody.navigation.Screen
 import com.example.moodmelody.network.RetrofitClient
 import com.example.moodmelody.ui.components.MoodChip
-import com.example.moodmelody.ui.components.PlaylistCard
 import com.example.moodmelody.ui.components.WeatherCard
 import com.example.moodmelody.viewmodel.MusicViewModel
 import kotlinx.coroutines.launch
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Error
-import com.example.moodmelody.model.Recommendation
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlin.coroutines.CoroutineContext
-import kotlinx.coroutines.Dispatchers
 import android.widget.Toast
 import android.util.Log
 import com.example.moodmelody.ui.components.EnhancedSongCard
@@ -259,7 +250,7 @@ fun HomeScreen(
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                     
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+
                     
                     Text(
                         text = "Suggested Songs:",
@@ -508,7 +499,7 @@ fun HomeScreen(
                         items(recommendations) { song ->
                             EnhancedSongCard(
                                 title = song.title,
-                                artist = song.artist ?: "未知艺术家",
+                                artist = song.artist ,
                                 coverUrl = song.coverUrl,
                                 onClick = { viewModel.playSong(song) }
                             )
@@ -556,13 +547,3 @@ private fun SpotifyLoginButton(onLoginSuccess: () -> Unit) {
     }
 }
 
-private val samplePlaylists = listOf(
-    PlaylistData("Sunny Mood", "https://example.com/cover1.jpg"),
-    PlaylistData("Rainy Thoughts", "https://example.com/cover2.jpg"),
-    PlaylistData("Night Solitude", "https://example.com/cover3.jpg")
-)
-
-data class PlaylistData(
-    val title: String,
-    val coverUrl: String
-) 

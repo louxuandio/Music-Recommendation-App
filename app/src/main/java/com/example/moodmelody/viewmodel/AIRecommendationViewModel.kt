@@ -9,35 +9,36 @@ import com.example.moodmelody.model.UserData
 import com.example.moodmelody.repository.AIRecommendationRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * AI音乐推荐ViewModel
+ * AI Music Recommendation ViewModel
  */
 class AIRecommendationViewModel(
     private val aiRecommendationRepository: AIRecommendationRepository = AIRecommendationRepository()
 ) : ViewModel() {
     
-    private val TAG = "AIRecommendViewModel"
+    private val TAG = "AIRecommendationViewModel"
     
-    // 推荐结果
+    // Recommendation results
     private val _recommendation = MutableStateFlow<Recommendation?>(null)
-    val recommendation: StateFlow<Recommendation?> = _recommendation
+    val recommendation: StateFlow<Recommendation?> = _recommendation.asStateFlow()
     
-    // 加载状态
+    // Loading state
     private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
     
-    // 错误信息
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error
+    // Error message
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
     
     /**
-     * 获取AI音乐推荐
-     * @param moodScore 心情得分 (0-100)
-     * @param keywords 关键词列表
-     * @param lyric 喜欢的歌词
-     * @param weather 当前天气
+     * Get AI music recommendations
+     * @param moodScore mood score (0-100)
+     * @param keywords list of keywords
+     * @param lyric favorite lyrics
+     * @param weather current weather
      */
     fun getRecommendation(
         moodScore: Float,
@@ -45,56 +46,56 @@ class AIRecommendationViewModel(
         lyric: String,
         weather: String
     ) {
-        // 创建用户数据对象
+        // Create user data object
         val userData = UserData(
             moodScore = moodScore,
             keywords = keywords,
             lyric = lyric,
-            weather = weather
+            weather = weather,
+            matchMood = true
         )
         
-        // 调用获取推荐方法
+        // Call the recommendation method
         getRecommendation(userData)
     }
     
     /**
-     * 获取AI音乐推荐
-     * @param userData 用户数据
+     * Get AI music recommendations
+     * @param userData user data
      */
-    fun getRecommendation(userData: UserData) {
+    private fun getRecommendation(userData: UserData) {
         viewModelScope.launch {
+            // Reset error state
+            _errorMessage.value = null
+            // Set loading state
+            _isLoading.value = true
+            
             try {
-                // 重置错误状态
-                _error.value = null
-                // 设置加载状态
-                _isLoading.value = true
-                
-                // 调用仓库方法获取推荐
+                // Call repository method to get recommendations
                 val result = aiRecommendationRepository.recommendWithOpenAI(userData)
                 
-                // 更新推荐结果
+                // Update recommendation results
                 _recommendation.value = result
-                
+                _isLoading.value = false
             } catch (e: AIRecommendationException) {
-                Log.e(TAG, "获取AI推荐失败: ${e.message}", e)
-                _error.value = e.message
+                Log.e(TAG, "Failed to get AI recommendation: ${e.message}", e)
+                _errorMessage.value = e.message
                 _recommendation.value = null
+                _isLoading.value = false
             } catch (e: Exception) {
-                Log.e(TAG, "获取AI推荐发生未知错误: ${e.message}", e)
-                _error.value = "获取推荐失败: ${e.message}"
+                Log.e(TAG, "Failed to get AI recommendation: ${e.message}", e)
+                _errorMessage.value = e.message
                 _recommendation.value = null
-            } finally {
-                // 结束加载状态
                 _isLoading.value = false
             }
         }
     }
     
     /**
-     * 清除当前推荐结果
+     * Clear current recommendation results
      */
     fun clearRecommendation() {
         _recommendation.value = null
-        _error.value = null
+        _errorMessage.value = null
     }
 } 

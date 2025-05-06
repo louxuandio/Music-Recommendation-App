@@ -3,6 +3,7 @@ package com.example.moodmelody.ui.screens.player
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -33,8 +34,8 @@ fun PlayerScreen(
     
     val context = LocalContext.current
     
-    // 如果没有连接，尝试连接
-    LaunchedEffect(playerManager) {
+    // If not connected, try to connect
+    LaunchedEffect(Unit) {
         if (!isConnected) {
             playerManager.connect()
         }
@@ -46,32 +47,32 @@ fun PlayerScreen(
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 顶部栏
+        // Top bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBackClick) {
+            IconButton(
+                onClick = { onBackClick() }
+            ) {
                 Icon(
                     imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "返回"
+                    contentDescription = "Back"
                 )
             }
             
             Text(
-                text = "正在播放",
+                text = "Now Playing",
                 style = MaterialTheme.typography.titleLarge
             )
-            
-            Spacer(modifier = Modifier.width(48.dp))
         }
         
         Spacer(modifier = Modifier.height(32.dp))
         
-        // 专辑封面
+        // Album cover
         Box(
             modifier = Modifier
                 .size(300.dp)
@@ -82,7 +83,7 @@ fun PlayerScreen(
             if (currentSong != null && !currentSong?.coverUrl.isNullOrEmpty()) {
                 AsyncImage(
                     model = currentSong?.coverUrl,
-                    contentDescription = "专辑封面",
+                    contentDescription = "Album Cover",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -90,54 +91,54 @@ fun PlayerScreen(
                 Icon(
                     imageVector = Icons.Default.MusicNote,
                     contentDescription = null,
-                    modifier = Modifier.size(100.dp),
+                    modifier = Modifier.size(80.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
             }
         }
         
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.height(32.dp))
         
-        // 歌曲信息
+        // Song information
         Text(
-            text = currentSong?.title ?: "未播放任何歌曲",
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontWeight = FontWeight.Bold
-            ),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            text = currentSong?.title ?: "No song playing",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.padding(horizontal = 16.dp)
         )
         
         Spacer(modifier = Modifier.height(8.dp))
         
         Text(
             text = currentSong?.artist ?: "",
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.padding(horizontal = 16.dp)
         )
         
-        Spacer(modifier = Modifier.height(50.dp))
+        Spacer(modifier = Modifier.height(48.dp))
         
-        // 播放控制按钮
+        // Playback controls buttons
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
                 onClick = { playerManager.skipToPrevious() },
-                modifier = Modifier.size(50.dp)
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Icon(
                     imageVector = Icons.Default.SkipPrevious,
-                    contentDescription = "上一首",
-                    modifier = Modifier.size(40.dp)
+                    contentDescription = "Previous",
+                    modifier = Modifier.size(28.dp)
                 )
             }
             
@@ -150,58 +151,58 @@ fun PlayerScreen(
                     }
                 },
                 modifier = Modifier
-                    .size(70.dp)
-                    .clip(RoundedCornerShape(50))
+                    .size(72.dp)
+                    .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primary)
-                    .padding(8.dp)
             ) {
                 Icon(
                     imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying) "暂停" else "播放",
+                    contentDescription = if (isPlaying) "Pause" else "Play",
                     tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(36.dp)
                 )
             }
             
             IconButton(
                 onClick = { playerManager.skipToNext() },
-                modifier = Modifier.size(50.dp)
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Icon(
                     imageVector = Icons.Default.SkipNext,
-                    contentDescription = "下一首",
-                    modifier = Modifier.size(40.dp)
+                    contentDescription = "Next",
+                    modifier = Modifier.size(28.dp)
                 )
             }
         }
         
-        Spacer(modifier = Modifier.height(20.dp))
-        
-        // 播放状态提示
+        // Playback status message
         if (!isConnected) {
             Text(
-                text = "Spotify未连接",
+                text = "Spotify not connected",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error
             )
         } else if (currentSong == null) {
             Text(
-                text = "选择一首歌曲开始播放",
+                text = "Select a song to start playing",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
         }
         
         Spacer(modifier = Modifier.weight(1f))
         
-        // 模拟播放测试按钮
+        // Test playback button
         if (currentSong == null) {
             Button(
                 onClick = {
-                    // 模拟播放一首歌曲
+                    // Simulate playing a song
                     val testSong = Song(
-                        title = "测试歌曲",
-                        artist = "测试艺术家",
+                        title = "Test Song",
+                        artist = "Test Artist",
                         coverUrl = null,
                         uri = null,
                         previewUrl = null
@@ -210,7 +211,7 @@ fun PlayerScreen(
                 },
                 modifier = Modifier.fillMaxWidth(0.7f)
             ) {
-                Text("播放测试歌曲")
+                Text("Play Test Song")
             }
         }
     }
